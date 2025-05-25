@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 
 export const metadata = {
-  title: "Daftar Mahasiswa | E-Pustaka",
+  title: "Edit Buku | E-Pustaka",
 };
 
 export default function MahasiswaLoginLayout({ children }: { children: ReactNode }) {

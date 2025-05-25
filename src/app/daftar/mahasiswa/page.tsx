@@ -4,8 +4,6 @@
 import React, { useState } from "react";
 import Image from "next/image";
 
-
-
 export default function MahasiswaRegister(): JSX.Element {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -18,8 +16,8 @@ export default function MahasiswaRegister(): JSX.Element {
           <Image
             src="/logo.png"
             alt="E-Pustaka Logo"
-            width={200}
-            height={200}
+            width={100}
+            height={100}
             priority
           />
         </div>
@@ -213,7 +211,7 @@ export default function MahasiswaRegister(): JSX.Element {
         {/* Switch to login */}
         <p className="text-center text-sm mt-4 text-gray-700">
           Sudah memiliki akun?{" "}
-          <a href="/login/mahasiswa" className="text-indigo-600 font-medium hover:underline">
+          <a href="/mahasiswa/login" className="text-indigo-600 font-medium hover:underline">
             Masuk Sekarang
           </a>
         </p>
