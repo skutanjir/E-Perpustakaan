@@ -16,9 +16,9 @@ const RECOMMENDATIONS = [
   { title: "Selamat Tinggal", author: "Tere Liye" },
 ];
 const TEAM = [
-  { name: "Jane Doe", role: "CEO & Founder", img: "/team1.jpg" },
-  { name: "John Smith", role: "CTO", img: "/team2.jpg" },
-  { name: "Alice Johnson", role: "Lead Designer", img: "/team3.jpg" },
+  { name: "Yosevian Misyael", role: "CEO & Founder", img: "/team1.jpg" },
+  { name: "Oktavia Ramadhani", role: "Designer", img: "/team2.jpg" },
+  { name: "Sulistyo Fajar Pratama", role: "Programmer", img: "/team3.jpg" },
 ];
 
 export default function Home(): JSX.Element {

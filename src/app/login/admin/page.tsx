@@ -92,14 +92,7 @@ export default function AdminLogin(): JSX.Element {
               )}
             </button>
           </div>
-
-          {/* Forgot */}
-          <div className="flex justify-end">
-            <a href="/reset-password" className="text-sm text-indigo-600 hover:underline">
-              Lupa Password?
-            </a>
-          </div>
-
+              <br />
           {/* Submit */}
           <button
             type="submit"
@@ -110,13 +103,6 @@ export default function AdminLogin(): JSX.Element {
           </button>
         </form>
 
-        {/* Switch to register */}
-        <p className="text-center text-sm mt-4 text-gray-700">
-          Belum memiliki akun?{" "}
-          <a href="/daftar/admin" className="text-indigo-600 font-medium hover:underline">
-            Daftar Sekarang
-          </a>
-        </p>
       </div>
     </div>
   );

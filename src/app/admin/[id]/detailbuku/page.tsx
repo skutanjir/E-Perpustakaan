@@ -1,6 +1,7 @@
 "use client";
 
 import Header from "../../../components/HeaderAdmin";
+import Sidebar from "../../../components/sidebar";
 import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,8 +57,10 @@ export default function AdminPage({ params }: PageProps): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 relative">
-      <Header />
+    <div className="flex min-h-screen bg-gray-50">
+         <Sidebar />
+       <div className="flex-1 flex flex-col">
+             <Header />
 
       <main className="flex items-center justify-center p-6 min-h-[80vh]">
         <section className="w-full max-w-3xl bg-gray-50 border border-gray-200 rounded-2xl p-8 shadow-lg relative z-10">
@@ -162,6 +165,7 @@ export default function AdminPage({ params }: PageProps): JSX.Element {
           )}
         </AnimatePresence>
       </main>
+    </div>
     </div>
   );
 }

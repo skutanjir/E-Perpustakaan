@@ -1,67 +1,65 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // import framer-motion
 import Header from "../../components/HeaderAdmin";
 import Sidebar from "../../components/sidebar";
 
-interface Kategori {
+// 1. Mengubah interface dari Kategori menjadi Author
+interface Author {
   id: number;
   nama: string;
-  deskripsi?: string;
+  bio?: string; // Menambahkan properti opsional untuk bio
 }
 
-const dummyData: Kategori[] = [
-  { id: 1, nama: "Fiksi" },
-  { id: 2, nama: "Non-Fiksi" },
-  { id: 3, nama: "Teknologi" },
-  { id: 4, nama: "Agama" },
-  { id: 5, nama: "Sejarah" },
-  { id: 6, nama: "Anak-anak" },
-  { id: 7, nama: "Sains" },
-  { id: 8, nama: "Bisnis" },
-  { id: 9, nama: "Bahasa" },
-  { id: 10, nama: "Kesehatan" },
-  { id: 11, nama: "Seni" },
+// 2. Mengganti dummyData dengan data para penulis
+const dummyData: Author[] = [
+  { id: 1, nama: "J.K. Rowling" },
+  { id: 2, nama: "Tere Liye" },
+  { id: 3, nama: "George Orwell" },
+  { id: 4, nama: "Andrea Hirata" },
+  { id: 5, nama: "Pramoedya Ananta Toer" },
+  { id: 6, "nama": "Haruki Murakami" },
+  { id: 7, nama: "Dee Lestari" },
+  { id: 8, nama: "Agatha Christie" },
+  { id: 9, nama: "Eka Kurniawan" },
+  { id: 10, nama: "Stephen King" },
+  { id: 11, nama: "Ahmad Tohari" },
 ];
 
 const PER_PAGE_OPTIONS = [5, 10, 20];
 
-export default function KategoriPage() {
-  const [data, setData] = useState<Kategori[]>(dummyData);
+export default function AuthorPage() {
+  // 3. Menyesuaikan nama state agar sesuai dengan konteks "Author"
+  const [data, setData] = useState<Author[]>(dummyData);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteMultipleModal, setShowDeleteMultipleModal] = useState(false); // baru
+  const [showDeleteMultipleModal, setShowDeleteMultipleModal] = useState(false);
 
-  const [editKategori, setEditKategori] = useState<Kategori | null>(null);
-  const [deleteKategori, setDeleteKategori] = useState<Kategori | null>(null);
+  const [editAuthor, setEditAuthor] = useState<Author | null>(null);
+  const [deleteAuthor, setDeleteAuthor] = useState<Author | null>(null);
 
   const [inputNama, setInputNama] = useState("");
 
-  const filteredData = data.filter((kategori) =>
-    kategori.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredData = data.filter((author) =>
+    author.nama.toLowerCase().includes(searchTerm.toLowerCase())
   );
-const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
-
-
-  // Hitung total halaman sesuai itemsPerPage dan data yang sudah difilter
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
-  // Ambil data sesuai halaman dan itemsPerPage
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
   useEffect(() => {
-    setCurrentPage(1); // reset ke halaman 1 saat searchTerm atau itemsPerPage berubah
+    setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
 
   const allSelectedOnPage =
@@ -88,79 +86,78 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
       setSelectedIds([...selectedIds, id]);
     }
   }
-
-  function handleAddKategori() {
+  
+  // 4. Mengubah fungsi handleAddKategori menjadi handleAddAuthor
+  function handleAddAuthor() {
     if (!inputNama.trim()) {
-      alert("Nama kategori tidak boleh kosong.");
+      alert("Nama author tidak boleh kosong.");
       return;
     }
     if (data.some((d) => d.nama.toLowerCase() === inputNama.toLowerCase())) {
-      alert("Kategori dengan nama tersebut sudah ada.");
+      alert("Author dengan nama tersebut sudah ada.");
       return;
     }
-    const newKategori: Kategori = {
+    const newAuthor: Author = {
       id: data.length ? Math.max(...data.map((d) => d.id)) + 1 : 1,
       nama: inputNama.trim(),
     };
-    setData([newKategori, ...data]);
+    setData([newAuthor, ...data]);
     setInputNama("");
     setShowAddModal(false);
   }
 
-  function openEditModal(kategori: Kategori) {
-    setEditKategori(kategori);
-    setInputNama(kategori.nama);
+  function openEditModal(author: Author) {
+    setEditAuthor(author);
+    setInputNama(author.nama);
     setShowEditModal(true);
   }
 
-  function handleEditKategori() {
+  function handleEditAuthor() {
     if (!inputNama.trim()) {
-      alert("Nama kategori tidak boleh kosong.");
+      alert("Nama author tidak boleh kosong.");
       return;
     }
     if (
       data.some(
         (d) =>
           d.nama.toLowerCase() === inputNama.toLowerCase() &&
-          d.id !== (editKategori?.id ?? 0)
+          d.id !== (editAuthor?.id ?? 0)
       )
     ) {
-      alert("Kategori dengan nama tersebut sudah ada.");
+      alert("Author dengan nama tersebut sudah ada.");
       return;
     }
     setData(
       data.map((d) =>
-        d.id === editKategori?.id ? { ...d, nama: inputNama.trim() } : d
+        d.id === editAuthor?.id ? { ...d, nama: inputNama.trim() } : d
       )
     );
     setShowEditModal(false);
-    setEditKategori(null);
+    setEditAuthor(null);
     setInputNama("");
   }
 
-  function openDeleteModal(kategori: Kategori) {
-    setDeleteKategori(kategori);
+  function openDeleteModal(author: Author) {
+    setDeleteAuthor(author);
     setShowDeleteModal(true);
   }
 
-  function handleDeleteKategori() {
-    if (!deleteKategori) return;
-    setData(data.filter((d) => d.id !== deleteKategori.id));
-    setSelectedIds(selectedIds.filter((id) => id !== deleteKategori.id));
+  function handleDeleteAuthor() {
+    if (!deleteAuthor) return;
+    setData(data.filter((d) => d.id !== deleteAuthor.id));
+    setSelectedIds(selectedIds.filter((id) => id !== deleteAuthor.id));
     setShowDeleteModal(false);
-    setDeleteKategori(null);
+    setDeleteAuthor(null);
   }
 
-  // ubah fungsi handleDeleteMultiple agar hanya membuka popup konfirmasi
   function handleDeleteMultiple() {
     if (selectedIds.length === 0) {
-      alert("Pilih kategori yang akan dihapus terlebih dahulu.");
+      alert("Pilih author yang akan dihapus terlebih dahulu.");
       return;
     }
     setShowDeleteMultipleModal(true);
   }
 
-  // fungsi hapus setelah konfirmasi popup multiple delete
   function confirmDeleteMultiple() {
     setData(data.filter((d) => !selectedIds.includes(d.id)));
     setSelectedIds([]);
@@ -175,24 +172,20 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-
       <div className="flex flex-col flex-1">
         <Header />
-
         <main className="p-6 overflow-auto">
+          {/* 5. Mengubah semua teks UI dari "Kategori" menjadi "Author" */}
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-semibold text-gray-800">Daftar Kategori</h1>
-
+            <h1 className="text-2xl font-semibold text-gray-800">Daftar Author</h1>
             <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
               >
-                + Tambah Kategori
+                + Tambah Author
               </button>
-
-
               <button
                 type="button"
                 onClick={handleDeleteMultiple}
@@ -207,23 +200,20 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
               </button>
             </div>
           </div>
-
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
             <div className="text-gray-700 text-sm">
               Menampilkan{" "}
               <span className="font-semibold">{currentData.length}</span> dari{" "}
               <span className="font-semibold">{filteredData.length}</span> data
             </div>
-
             <input
               type="text"
-              placeholder="Cari kategori..."
+              placeholder="Cari author..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-xs focus:outline-none text-black focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
           <div className="mb-4 flex items-center space-x-2">
             <label
               htmlFor="itemsPerPage"
@@ -244,7 +234,6 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
               ))}
             </select>
           </div>
-
           <div className="overflow-x-auto bg-white rounded shadow">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-100 border-b border-gray-300">
@@ -257,19 +246,18 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                         if (input) input.indeterminate = someSelectedOnPage;
                       }}
                       onChange={toggleSelectAll}
-                      aria-label="Select all categories on current page"
+                      aria-label="Select all authors on current page"
                       className="cursor-pointer"
                     />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                    Nama Kategori
+                    Nama Author
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wide">
                     Aksi
                   </th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-gray-100">
                 {currentData.length === 0 ? (
                   <tr>
@@ -277,39 +265,39 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                       colSpan={4}
                       className="px-6 py-4 whitespace-nowrap text-center text-gray-500"
                     >
-                      Tidak ada data kategori ditemukan.
+                      Tidak ada data author ditemukan.
                     </td>
                   </tr>
                 ) : (
-                  currentData.map((kategori) => (
+                  currentData.map((author) => (
                     <tr
-                      key={kategori.id}
+                      key={author.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                         <input
                           type="checkbox"
-                          checked={selectedIds.includes(kategori.id)}
-                          onChange={() => toggleSelectOne(kategori.id)}
-                          aria-label={`Select kategori ${kategori.nama}`}
+                          checked={selectedIds.includes(author.id)}
+                          onChange={() => toggleSelectOne(author.id)}
+                          aria-label={`Select author ${author.nama}`}
                           className="cursor-pointer"
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                        {kategori.nama}
+                        {author.nama}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
                         <button
-                          onClick={() => openEditModal(kategori)}
+                          onClick={() => openEditModal(author)}
                           className="text-blue-600 hover:underline"
-                          aria-label={`Edit kategori ${kategori.nama}`}
+                          aria-label={`Edit author ${author.nama}`}
                         >
                           Edit
                         </button>
                         <button
-                          onClick={() => openDeleteModal(kategori)}
+                          onClick={() => openDeleteModal(author)}
                           className="text-red-600 hover:underline"
-                          aria-label={`Hapus kategori ${kategori.nama}`}
+                          aria-label={`Hapus author ${author.nama}`}
                         >
                           Hapus
                         </button>
@@ -321,40 +309,39 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
             </table>
           </div>
 
-         <div className="mt-6 flex justify-end space-x-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                    currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  Prev
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                      currentPage === page ? "bg-black text-white" : ""
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                    currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  Next
-                </button>
-              </div>
+          <div className="mt-6 flex justify-end space-x-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                  currentPage === page ? "bg-black text-white" : ""
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(currentPage + 1)}
+              className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              Next
+            </button>
+          </div>
 
-
-          {/* Modal Tambah */}
+          {/* Modal Tambah Author */}
           <AnimatePresence>
             {showAddModal && (
               <motion.div
@@ -363,8 +350,6 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowAddModal(false)}
-                aria-modal="true"
-                role="dialog"
               >
                 <motion.div
                   className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
@@ -373,10 +358,10 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                   exit={{ scale: 0.8, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h3 className="text-lg font-semibold mb-4 text-black">Tambah Kategori</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-black">Tambah Author</h3>
                   <input
                     type="text"
-                    placeholder="Nama kategori"
+                    placeholder="Nama author"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
                     className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -389,7 +374,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                       Batal
                     </button>
                     <button
-                      onClick={handleAddKategori}
+                      onClick={handleAddAuthor}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                       Simpan
@@ -400,7 +385,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
             )}
           </AnimatePresence>
 
-          {/* Modal Edit */}
+          {/* Modal Edit Author */}
           <AnimatePresence>
             {showEditModal && (
               <motion.div
@@ -409,8 +394,6 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowEditModal(false)}
-                aria-modal="true"
-                role="dialog"
               >
                 <motion.div
                   className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
@@ -419,10 +402,10 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                   exit={{ scale: 0.8, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h3 className="text-lg font-semibold mb-4 text-black">Edit Kategori</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-black">Edit Author</h3>
                   <input
                     type="text"
-                    placeholder="Nama kategori"
+                    placeholder="Nama author"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
                     className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -435,7 +418,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                       Batal
                     </button>
                     <button
-                      onClick={handleEditKategori}
+                      onClick={handleEditAuthor}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                       Simpan
@@ -446,17 +429,15 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
             )}
           </AnimatePresence>
 
-          {/* Modal Hapus Satu */}
+          {/* Modal Hapus Satu Author */}
           <AnimatePresence>
-            {showDeleteModal && deleteKategori && (
+            {showDeleteModal && deleteAuthor && (
               <motion.div
                 className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowDeleteModal(false)}
-                aria-modal="true"
-                role="dialog"
               >
                 <motion.div
                   className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
@@ -469,8 +450,8 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                     Konfirmasi Hapus
                   </h3>
                   <p className="mb-6 text-gray-700">
-                    Apakah yakin ingin menghapus kategori{" "}
-                    <strong>{deleteKategori.nama}</strong>?
+                    Apakah yakin ingin menghapus author{" "}
+                    <strong>{deleteAuthor.nama}</strong>?
                   </p>
                   <div className="flex justify-center space-x-4">
                     <button
@@ -480,7 +461,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                       Batal
                     </button>
                     <button
-                      onClick={handleDeleteKategori}
+                      onClick={handleDeleteAuthor}
                       className="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700"
                     >
                       Hapus
@@ -491,7 +472,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
             )}
           </AnimatePresence>
 
-          {/* Modal Hapus Multiple */}
+          {/* Modal Hapus Multiple Author */}
           <AnimatePresence>
             {showDeleteMultipleModal && (
               <motion.div
@@ -500,8 +481,6 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowDeleteMultipleModal(false)}
-                aria-modal="true"
-                role="dialog"
               >
                 <motion.div
                   className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
@@ -515,7 +494,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                   </h3>
                   <p className="mb-6 text-gray-700">
                     Apakah yakin ingin menghapus{" "}
-                    <strong>{selectedIds.length}</strong> kategori yang dipilih?
+                    <strong>{selectedIds.length}</strong> author yang dipilih?
                   </p>
                   <div className="flex justify-center space-x-4">
                     <button
