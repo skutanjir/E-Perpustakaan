@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Header from "../../components/HeaderAdmin";
-import Sidebar from "../../components/sidebar";
+import Header from "../../components/HeaderAdmin"; // Sesuaikan path jika perlu
+import Sidebar from "../../components/sidebar"; // Sesuaikan path jika perlu
+import { HiPencil, HiTrash } from "react-icons/hi";
+// Impor ikon untuk modal notifikasi
+import { ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 interface Kategori {
   id: number;
@@ -31,37 +34,42 @@ export default function KategoriPage() {
   const [data, setData] = useState<Kategori[]>(dummyData);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteMultipleModal, setShowDeleteMultipleModal] = useState(false); // baru
+  const [showDeleteMultipleModal, setShowDeleteMultipleModal] = useState(false);
 
   const [editKategori, setEditKategori] = useState<Kategori | null>(null);
   const [deleteKategori, setDeleteKategori] = useState<Kategori | null>(null);
 
   const [inputNama, setInputNama] = useState("");
+  const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
+
+  // --- State untuk Modal Notifikasi ---
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState<"success" | "error">("error");
+
+  // Fungsi untuk menampilkan notifikasi modal
+  const showNotification = (message: string, type: "success" | "error") => {
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotificationModal(true);
+  };
 
   const filteredData = data.filter((kategori) =>
     kategori.nama.toLowerCase().includes(searchTerm.toLowerCase())
   );
-const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
-
-
-
-  // Hitung total halaman sesuai itemsPerPage dan data yang sudah difilter
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-  // Ambil data sesuai halaman dan itemsPerPage
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
   useEffect(() => {
-    setCurrentPage(1); // reset ke halaman 1 saat searchTerm atau itemsPerPage berubah
+    setCurrentPage(1); 
   }, [searchTerm, itemsPerPage]);
 
   const allSelectedOnPage =
@@ -91,11 +99,11 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
   function handleAddKategori() {
     if (!inputNama.trim()) {
-      alert("Nama kategori tidak boleh kosong.");
+      showNotification("Nama kategori tidak boleh kosong.", "error");
       return;
     }
     if (data.some((d) => d.nama.toLowerCase() === inputNama.toLowerCase())) {
-      alert("Kategori dengan nama tersebut sudah ada.");
+      showNotification("Kategori dengan nama tersebut sudah ada.", "error");
       return;
     }
     const newKategori: Kategori = {
@@ -105,6 +113,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
     setData([newKategori, ...data]);
     setInputNama("");
     setShowAddModal(false);
+    showNotification(`Kategori "${newKategori.nama}" berhasil ditambahkan.`, "success");
   }
 
   function openEditModal(kategori: Kategori) {
@@ -115,7 +124,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
   function handleEditKategori() {
     if (!inputNama.trim()) {
-      alert("Nama kategori tidak boleh kosong.");
+      showNotification("Nama kategori tidak boleh kosong.", "error");
       return;
     }
     if (
@@ -125,17 +134,19 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
           d.id !== (editKategori?.id ?? 0)
       )
     ) {
-      alert("Kategori dengan nama tersebut sudah ada.");
+      showNotification("Kategori dengan nama tersebut sudah ada.", "error");
       return;
     }
+    const updatedKategoriName = inputNama.trim();
     setData(
       data.map((d) =>
-        d.id === editKategori?.id ? { ...d, nama: inputNama.trim() } : d
+        d.id === editKategori?.id ? { ...d, nama: updatedKategoriName } : d
       )
     );
     setShowEditModal(false);
     setEditKategori(null);
     setInputNama("");
+    showNotification(`Kategori "${updatedKategoriName}" berhasil diperbarui.`, "success");
   }
 
   function openDeleteModal(kategori: Kategori) {
@@ -145,63 +156,61 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
   function handleDeleteKategori() {
     if (!deleteKategori) return;
+    const kategoriNameToDelete = deleteKategori.nama;
     setData(data.filter((d) => d.id !== deleteKategori.id));
     setSelectedIds(selectedIds.filter((id) => id !== deleteKategori.id));
     setShowDeleteModal(false);
     setDeleteKategori(null);
+    showNotification(`Kategori "${kategoriNameToDelete}" berhasil dihapus.`, "success");
   }
 
-  // ubah fungsi handleDeleteMultiple agar hanya membuka popup konfirmasi
   function handleDeleteMultiple() {
     if (selectedIds.length === 0) {
-      alert("Pilih kategori yang akan dihapus terlebih dahulu.");
+      showNotification("Pilih kategori yang akan dihapus terlebih dahulu.", "error");
       return;
     }
     setShowDeleteMultipleModal(true);
   }
 
-  // fungsi hapus setelah konfirmasi popup multiple delete
   function confirmDeleteMultiple() {
+    const numDeleted = selectedIds.length;
     setData(data.filter((d) => !selectedIds.includes(d.id)));
     setSelectedIds([]);
     setShowDeleteMultipleModal(false);
+    showNotification(`${numDeleted} kategori berhasil dihapus.`, "success");
   }
 
-  function goToPage(page: number) {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-  }
+  // Fungsi goToPage tidak digunakan secara eksplisit lagi karena paginasi di-handle setCurrentPage
+  // function goToPage(page: number) {
+  //   if (page < 1 || page > totalPages) return;
+  //   setCurrentPage(page);
+  // }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-
       <div className="flex flex-col flex-1">
         <Header />
-
         <main className="p-6 overflow-auto">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-semibold text-gray-800">Daftar Kategori</h1>
-
             <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium"
               >
                 + Tambah Kategori
               </button>
-
-
               <button
                 type="button"
                 onClick={handleDeleteMultiple}
                 disabled={selectedIds.length === 0}
-                className={`px-4 py-2 rounded ${
+                className={`px-4 py-2 rounded-lg transition-colors shadow-sm font-medium ${
                   selectedIds.length === 0
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                } transition-colors`}
+                    : "bg-rose-600 text-white hover:bg-rose-700"
+                }`}
               >
                 Hapus Terpilih
               </button>
@@ -210,11 +219,9 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
             <div className="text-gray-700 text-sm">
-              Menampilkan{" "}
-              <span className="font-semibold">{currentData.length}</span> dari{" "}
+              Menampilkan <span className="font-semibold">{currentData.length}</span> dari{" "}
               <span className="font-semibold">{filteredData.length}</span> data
             </div>
-
             <input
               type="text"
               placeholder="Cari kategori..."
@@ -223,12 +230,8 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
               className="border border-gray-300 rounded px-3 py-2 text-sm w-full max-w-xs focus:outline-none text-black focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
           <div className="mb-4 flex items-center space-x-2">
-            <label
-              htmlFor="itemsPerPage"
-              className="text-black text-sm font-semibold"
-            >
+            <label htmlFor="itemsPerPage" className="text-black text-sm font-semibold">
               Data per halaman:
             </label>
             <select
@@ -253,9 +256,7 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                     <input
                       type="checkbox"
                       checked={allSelectedOnPage}
-                      ref={(input) => {
-                        if (input) input.indeterminate = someSelectedOnPage;
-                      }}
+                      ref={(input) => { if (input) input.indeterminate = someSelectedOnPage; }}
                       onChange={toggleSelectAll}
                       aria-label="Select all categories on current page"
                       className="cursor-pointer"
@@ -269,23 +270,16 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                   </th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-gray-100">
                 {currentData.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="px-6 py-4 whitespace-nowrap text-center text-gray-500"
-                    >
+                    <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-center text-gray-500">
                       Tidak ada data kategori ditemukan.
                     </td>
                   </tr>
                 ) : (
                   currentData.map((kategori) => (
-                    <tr
-                      key={kategori.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
+                    <tr key={kategori.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                         <input
                           type="checkbox"
@@ -298,21 +292,25 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                         {kategori.nama}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
-                        <button
-                          onClick={() => openEditModal(kategori)}
-                          className="text-blue-600 hover:underline"
-                          aria-label={`Edit kategori ${kategori.nama}`}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(kategori)}
-                          className="text-red-600 hover:underline"
-                          aria-label={`Hapus kategori ${kategori.nama}`}
-                        >
-                          Hapus
-                        </button>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center space-x-3">
+                          <button
+                            onClick={() => openEditModal(kategori)}
+                            className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors duration-200 text-sm font-medium"
+                            aria-label={`Edit kategori ${kategori.nama}`}
+                          >
+                            <HiPencil />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(kategori)}
+                            className="flex items-center gap-2 px-3 py-1 bg-rose-100 text-rose-700 rounded-md hover:bg-rose-200 transition-colors duration-200 text-sm font-medium"
+                            aria-label={`Hapus kategori ${kategori.nama}`}
+                          >
+                            <HiTrash />
+                            Hapus
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -321,56 +319,49 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
             </table>
           </div>
 
-         <div className="mt-6 flex justify-end space-x-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                    currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  Prev
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                      currentPage === page ? "bg-black text-white" : ""
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                    currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                  Next
-                </button>
-              </div>
-
+          <div className="mt-6 flex justify-end space-x-2">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(currentPage - 1)}
+              className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                  currentPage === page ? "bg-black text-white" : ""
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage(currentPage + 1)}
+              className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
+                currentPage === totalPages || totalPages === 0 ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              Next
+            </button>
+          </div>
 
           {/* Modal Tambah */}
           <AnimatePresence>
             {showAddModal && (
               <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setShowAddModal(false)}
-                aria-modal="true"
-                role="dialog"
               >
                 <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
+                  className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full"
+                  initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <h3 className="text-lg font-semibold mb-4 text-black">Tambah Kategori</h3>
@@ -379,19 +370,13 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
                     placeholder="Nama kategori"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowAddModal(false)}
-                      className="px-4 py-2 rounded border text-black border-gray-300 hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleAddKategori}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
+                    <button onClick={handleAddKategori} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium">
                       Simpan
                     </button>
                   </div>
@@ -402,43 +387,24 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
           {/* Modal Edit */}
           <AnimatePresence>
-            {showEditModal && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowEditModal(false)}
-                aria-modal="true"
-                role="dialog"
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+            {showEditModal && editKategori && (
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => { setShowEditModal(false); setInputNama(""); }}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
                   <h3 className="text-lg font-semibold mb-4 text-black">Edit Kategori</h3>
                   <input
                     type="text"
                     placeholder="Nama kategori"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowEditModal(false)}
-                      className="px-4 py-2 rounded border text-black border-gray-300 hover:bg-gray-100"
-                    >
+                    <button onClick={() => { setShowEditModal(false); setInputNama(""); }} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleEditKategori}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      Simpan
+                    <button onClick={handleEditKategori} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium">
+                      Simpan Perubahan
                     </button>
                   </div>
                 </motion.div>
@@ -449,40 +415,19 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
           {/* Modal Hapus Satu */}
           <AnimatePresence>
             {showDeleteModal && deleteKategori && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowDeleteModal(false)}
-                aria-modal="true"
-                role="dialog"
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-lg text-black font-semibold mb-4">
-                    Konfirmasi Hapus
-                  </h3>
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => setShowDeleteModal(false)}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-lg text-black font-semibold mb-4">Konfirmasi Hapus</h3>
                   <p className="mb-6 text-gray-700">
                     Apakah yakin ingin menghapus kategori{" "}
                     <strong>{deleteKategori.nama}</strong>?
                   </p>
                   <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => setShowDeleteModal(false)}
-                      className="px-5 py-2 rounded border border-gray-300 text-black hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowDeleteModal(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleDeleteKategori}
-                      className="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700"
-                    >
+                    <button onClick={handleDeleteKategori} className="bg-rose-600 text-white px-5 py-2 rounded-lg hover:bg-rose-700 transition-colors shadow-sm font-medium">
                       Hapus
                     </button>
                   </div>
@@ -494,40 +439,19 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
           {/* Modal Hapus Multiple */}
           <AnimatePresence>
             {showDeleteMultipleModal && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowDeleteMultipleModal(false)}
-                aria-modal="true"
-                role="dialog"
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-lg text-black font-semibold mb-4">
-                    Konfirmasi Hapus
-                  </h3>
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => setShowDeleteMultipleModal(false)}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-lg text-black font-semibold mb-4">Konfirmasi Hapus</h3>
                   <p className="mb-6 text-gray-700">
                     Apakah yakin ingin menghapus{" "}
                     <strong>{selectedIds.length}</strong> kategori yang dipilih?
                   </p>
                   <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => setShowDeleteMultipleModal(false)}
-                      className="px-5 py-2 rounded border border-gray-300 text-black hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowDeleteMultipleModal(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={confirmDeleteMultiple}
-                      className="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700"
-                    >
+                    <button onClick={confirmDeleteMultiple} className="bg-rose-600 text-white px-5 py-2 rounded-lg hover:bg-rose-700 transition-colors shadow-sm font-medium">
                       Hapus
                     </button>
                   </div>
@@ -535,6 +459,46 @@ const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
               </motion.div>
             )}
           </AnimatePresence>
+          
+          {/* --- Modal Notifikasi (Error/Success) --- */}
+          <AnimatePresence>
+            {showNotificationModal && (
+              <motion.div
+                className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-[100]" // z-index lebih tinggi
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowNotificationModal(false)}
+              >
+                <motion.div
+                  className={`bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center mx-4
+                    border-t-4 ${notificationType === 'error' ? 'border-red-500' : 'border-green-500'}`}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.7, opacity: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {notificationType === 'error' ? (
+                    <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                  ) : (
+                    <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  )}
+                  <h3 className={`text-xl font-semibold mb-3 ${notificationType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {notificationType === 'error' ? 'Terjadi Kesalahan' : 'Berhasil!'}
+                  </h3>
+                  <p className="text-gray-700 mb-6">{notificationMessage}</p>
+                  <button
+                    onClick={() => setShowNotificationModal(false)}
+                    className={`w-full px-4 py-2 rounded-lg text-white font-medium transition-colors
+                      ${notificationType === 'error' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+                  >
+                    Tutup
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </main>
       </div>
     </div>

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Header from "../components/HeaderAdmin";
 import Sidebar from "../components/sidebar";
 import Link from "next/link";
+import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
+import { FiCamera } from "react-icons/fi";
 
 // --- INTERFACES ---
 interface Book {
@@ -19,15 +21,15 @@ interface Loan {
   name: string;
   nrp: string;
   tglPinjam: string;
-  tglKembali: string; // Tanggal seharusnya buku kembali
+  tglKembali: string;
 }
 
 interface Return extends Loan {
-  tglDikembalikan: string; // Tanggal aktual buku dikembalikan
+  tglDikembalikan: string;
   isLate: boolean;
 }
 
-// --- DUMMY DATA ---
+// --- DATA AWAL (DUMMY DATA) ---
 const initialBooks: Book[] = [
     { id: 1, title: "Seni Memahami Hidup Minimalis" },
     { id: 2, title: "Dia adalah Dilanku Tahun 1990" },
@@ -41,7 +43,7 @@ const initialBooks: Book[] = [
 const initialPeminjamans: Loan[] = [
   { id: 1, title: "Kata", bookId: "9786020646200", name: "Nasya", nrp: "3124500000", tglPinjam: "2025-05-10", tglKembali: "2025-05-17" },
   { id: 2, title: "Dilan", bookId: "9786027870813", name: "Kiara", nrp: "3124600000", tglPinjam: "2025-05-20", tglKembali: "2025-05-27" },
-  { id: 3, title: "Filosofi Teras", bookId: "9786020383 filosofi", name: "Budi", nrp: "3124700000", tglPinjam: "2025-05-15", tglKembali: "2025-05-22" },
+  { id: 3, title: "Filosofi Teras", bookId: "9786020383", name: "Budi", nrp: "3124700000", tglPinjam: "2025-05-15", tglKembali: "2025-05-22" },
 ];
 
 const initialPengembalians: Return[] = [
@@ -49,51 +51,50 @@ const initialPengembalians: Return[] = [
   { id: 2, title: "Bumi Manusia", bookId: "9789799731234", name: "Joko", nrp: "3124900000", tglPinjam: "2025-05-05", tglKembali: "2025-05-12", tglDikembalikan: "2025-05-11", isLate: false },
 ];
 
-
 export default function Page() {
+  // State untuk data dan UI
   const [activeTab, setActiveTab] = useState<"buku" | "peminjaman" | "pengembalian">("buku");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
   
+  // State untuk data yang bisa berubah
   const [books, setBooks] = useState<Book[]>(initialBooks);
   const [peminjamans, setPeminjamans] = useState<Loan[]>(initialPeminjamans);
   const [pengembalians, setPengembalians] = useState<Return[]>(initialPengembalians);
 
+  // State untuk filter dan search
   const [searchTerm, setSearchTerm] = useState("");
   const [returnFilter, setReturnFilter] = useState<"all" | "late" | "ontime">("all");
   
+  // State untuk modal
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  // --- LOGIKA BARU UNTUK FILTER DAN SEARCH ---
+  // Fungsi untuk memfilter dan mencari data sesuai tab aktif
   const filteredAndSearchedData = () => {
     let currentData: any[] = [];
-    
     if (activeTab === 'buku') {
       currentData = books.filter(b => b.title.toLowerCase().includes(searchTerm.toLowerCase()));
-    } 
-    else if (activeTab === 'peminjaman') {
+    } else if (activeTab === 'peminjaman') {
       currentData = peminjamans.filter(p => 
         p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.nrp.includes(searchTerm)
       );
-    } 
-    else if (activeTab === 'pengembalian') {
+    } else if (activeTab === 'pengembalian') {
       let filtered = pengembalians;
       if (returnFilter === 'late') {
         filtered = pengembalians.filter(p => p.isLate);
       } else if (returnFilter === 'ontime') {
         filtered = pengembalians.filter(p => !p.isLate);
       }
-      
       currentData = filtered.filter(p => 
         p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.nrp.includes(searchTerm)
       );
     }
-    
     return currentData;
   };
 
@@ -112,26 +113,75 @@ export default function Page() {
     setShowReturnModal(true);
   };
 
+  // Fungsi untuk memproses pengembalian buku
   const handleReturnBook = () => {
     if (!selectedLoan) return;
-
     setPeminjamans(peminjamans.filter(p => p.id !== selectedLoan.id));
-
     const returnDate = new Date();
     const dueDate = new Date(selectedLoan.tglKembali);
-    
     const newReturn: Return = {
       ...selectedLoan,
       id: pengembalians.length + 1,
       tglDikembalikan: returnDate.toISOString().split('T')[0],
       isLate: returnDate > dueDate,
     };
-
     setPengembalians([newReturn, ...pengembalians]);
-
     setShowReturnModal(false);
     setSelectedLoan(null);
   };
+  
+  // Hook untuk mengelola siklus hidup QR Code Scanner
+  useEffect(() => {
+    if (!isScannerOpen) {
+      return;
+    }
+
+    const qrCodeRegionId = "qr-reader";
+    const html5QrCode = new Html5Qrcode(qrCodeRegionId);
+
+    const onScanSuccess = (decodedText: string) => {
+      html5QrCode.pause();
+      const scannedId = decodedText;
+      const foundLoan = peminjamans.find(p => p.id.toString() === scannedId);
+      
+      if (foundLoan) {
+        setIsScannerOpen(false);
+        openReturnModal(foundLoan);
+      } else {
+        alert(`Peminjaman dengan ID "${scannedId}" tidak ditemukan.`);
+        setTimeout(() => {
+          if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
+            html5QrCode.resume();
+          }
+        }, 1000);
+      }
+    };
+    
+    const startScanner = async () => {
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          (errorMessage) => {}
+        );
+      } catch (err) {
+        console.error("Gagal memulai QR scanner:", err);
+        alert("Tidak dapat memulai kamera. Pastikan Anda telah memberikan izin pada browser.");
+        setIsScannerOpen(false);
+      }
+    };
+    
+    startScanner();
+
+    return () => {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => {
+          console.error("Gagal menghentikan QR scanner dengan benar:", err);
+        });
+      }
+    };
+  }, [isScannerOpen, peminjamans]);
 
   return (
     <div className="min-h-screen flex">
@@ -139,12 +189,11 @@ export default function Page() {
       <div className="flex-1 bg-gray-50">
         <Header />
         <main className="px-8 py-6">
-          {/* == KARTU STATISTIK DIKEMBALIKAN == */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             {[
               { label: "Jumlah Buku", value: books.length },
               { label: "Sedang Dipinjam", value: peminjamans.length },
-              { label: "Rata-rata Traffic/Bulan", value: 15 }, // Nilai statis sesuai permintaan
+              { label: "Rata-rata Traffic/Bulan", value: 15 },
               { label: "Buku Telat", value: pengembalians.filter(r => r.isLate).length, isHighlight: true },
             ].map(({ label, value, isHighlight }, i) => (
               <div
@@ -160,34 +209,41 @@ export default function Page() {
               </div>
             ))}
           </div>
-          {/* ===================================== */}
 
-          {/* Tab menu */}
           <nav className="flex gap-4 mb-8">
-            {["buku", "peminjaman", "pengembalian"].map((tab) => {
-              const label = tab.charAt(0).toUpperCase() + tab.slice(1);
-              const isActive = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as any)}
-                  className={`px-6 py-2 rounded-full font-medium transition ${isActive ? "bg-[#678D7D] text-white" : "border border-[#678D7D] text-[#678D7D]"}`}
-                >
-                  {label}
-                </button>
-              );
-            })}
+            {["buku", "peminjaman", "pengembalian"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`px-6 py-2 rounded-full font-medium transition ${
+                  activeTab === tab ? "bg-[#678D7D] text-white" : "border border-[#678D7D] text-[#678D7D]"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </nav>
           
           <div className="bg-white border border-gray-300 rounded-2xl p-4 shadow-sm">
             <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
-              <input
-                type="text"
-                placeholder={`Cari di ${activeTab}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-[#678D7D]"
-              />
+              <div className="flex w-full md:w-auto gap-2">
+                <input
+                  type="text"
+                  placeholder={`Cari di ${activeTab}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-[#678D7D]"
+                />
+                {activeTab === 'peminjaman' && (
+                  <button
+                    onClick={() => setIsScannerOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#678D7D] text-white rounded-lg hover:bg-[#5a776d] transition"
+                  >
+                    <FiCamera />
+                    <span>Scan</span>
+                  </button>
+                )}
+              </div>
               
               {activeTab === 'pengembalian' && (
                 <div className="flex gap-2">
@@ -198,7 +254,6 @@ export default function Page() {
               )}
             </div>
             
-            {/* --- Konten Tab --- */}
             {activeTab === "buku" && (
                 <div>
                   <h1 className="text-2xl font-semibold text-gray-800 mb-4">List Buku</h1>
@@ -221,12 +276,14 @@ export default function Page() {
                 <table className="min-w-full table-auto border-collapse">
                   <thead>
                     <tr className="border-b border-gray-300">
+                        {/* PERUBAHAN DI SINI: Kolom "ID Pinjam" dihilangkan dari header */}
                         {['Judul Buku', 'Nama', 'NRP', 'Tgl Pinjam', 'Tgl Kembali', 'Aksi'].map(h => <th key={h} className="px-4 py-2 text-left text-gray-800 font-semibold">{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {pagedData.map((p: Loan) => (
                       <tr key={p.id} className="bg-white border-b">
+                        {/* PERUBAHAN DI SINI: Kolom "ID Pinjam" tidak dirender, tapi kolom tanggal ditambahkan */}
                         <td className="px-4 py-2 text-gray-900">{p.title}</td>
                         <td className="px-4 py-2 text-gray-900">{p.name}</td>
                         <td className="px-4 py-2 text-gray-900">{p.nrp}</td>
@@ -273,7 +330,6 @@ export default function Page() {
               </div>
             )}
             
-            {/* Paginasi */}
             <div className="mt-6 flex justify-between items-center">
                 <div className="flex items-center space-x-3 text-black">
                     <label htmlFor="itemsPerPage" className="text-sm font-medium">Data per halaman:</label>
@@ -293,7 +349,28 @@ export default function Page() {
         </main>
       </div>
 
-      {/* Modal Pengembalian Buku */}
+      <AnimatePresence>
+        {isScannerOpen && (
+          <motion.div
+            className="fixed inset-0 bg-transparent bg-opacity-70 flex flex-col items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="bg-white p-4 rounded-lg shadow-xl w-11/12 max-w-md">
+              <div id="qr-reader" className="w-full"></div>
+            </div>
+            <p className="text-black mt-4">Arahkan kamera ke QR Code peminjaman</p>
+            <button
+              onClick={() => setIsScannerOpen(false)}
+              className="mt-4 px-6 py-2 bg-white text-black rounded-lg"
+            >
+              Batal
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showReturnModal && selectedLoan && (
           <motion.div

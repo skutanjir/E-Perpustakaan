@@ -1,41 +1,33 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion"; // import framer-motion
-import Header from "../../components/HeaderAdmin";
-import Sidebar from "../../components/sidebar";
+import { motion, AnimatePresence } from "framer-motion";
+import Header from "../../components/HeaderAdmin"; // Sesuaikan path jika perlu
+import Sidebar from "../../components/sidebar"; // Sesuaikan path jika perlu
+import { HiPencil, HiTrash } from "react-icons/hi";
+// Impor ikon untuk modal notifikasi
+import { ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
-// 1. Mengubah interface dari Kategori menjadi Author
 interface Author {
   id: number;
   nama: string;
-  bio?: string; // Menambahkan properti opsional untuk bio
+  deskripsi?: string;
 }
 
-// 2. Mengganti dummyData dengan data para penulis
 const dummyData: Author[] = [
-  { id: 1, nama: "J.K. Rowling" },
-  { id: 2, nama: "Tere Liye" },
-  { id: 3, nama: "George Orwell" },
-  { id: 4, nama: "Andrea Hirata" },
-  { id: 5, nama: "Pramoedya Ananta Toer" },
-  { id: 6, "nama": "Haruki Murakami" },
-  { id: 7, nama: "Dee Lestari" },
-  { id: 8, nama: "Agatha Christie" },
-  { id: 9, nama: "Eka Kurniawan" },
-  { id: 10, nama: "Stephen King" },
-  { id: 11, nama: "Ahmad Tohari" },
+  { id: 1, nama: "Tere Liye" },
+  { id: 2, nama: "J.K. Rowling" },
+  { id: 3, nama: "Andrea Hirata" },
+  // ... (data author lainnya)
 ];
 
 const PER_PAGE_OPTIONS = [5, 10, 20];
 
 export default function AuthorPage() {
-  // 3. Menyesuaikan nama state agar sesuai dengan konteks "Author"
   const [data, setData] = useState<Author[]>(dummyData);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -46,13 +38,24 @@ export default function AuthorPage() {
   const [deleteAuthor, setDeleteAuthor] = useState<Author | null>(null);
 
   const [inputNama, setInputNama] = useState("");
+  const [itemsPerPage, setItemsPerPage] = useState(PER_PAGE_OPTIONS[0]);
+
+  // --- State untuk Modal Notifikasi ---
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState<"success" | "error">("error");
+
+  // Fungsi untuk menampilkan notifikasi modal
+  const showNotification = (message: string, type: "success" | "error") => {
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotificationModal(true);
+  };
 
   const filteredData = data.filter((author) =>
     author.nama.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -86,15 +89,14 @@ export default function AuthorPage() {
       setSelectedIds([...selectedIds, id]);
     }
   }
-  
-  // 4. Mengubah fungsi handleAddKategori menjadi handleAddAuthor
+
   function handleAddAuthor() {
     if (!inputNama.trim()) {
-      alert("Nama author tidak boleh kosong.");
+      showNotification("Nama author tidak boleh kosong.", "error");
       return;
     }
     if (data.some((d) => d.nama.toLowerCase() === inputNama.toLowerCase())) {
-      alert("Author dengan nama tersebut sudah ada.");
+      showNotification("Author dengan nama tersebut sudah ada.", "error");
       return;
     }
     const newAuthor: Author = {
@@ -104,6 +106,7 @@ export default function AuthorPage() {
     setData([newAuthor, ...data]);
     setInputNama("");
     setShowAddModal(false);
+    showNotification(`Author "${newAuthor.nama}" berhasil ditambahkan.`, "success");
   }
 
   function openEditModal(author: Author) {
@@ -114,7 +117,7 @@ export default function AuthorPage() {
 
   function handleEditAuthor() {
     if (!inputNama.trim()) {
-      alert("Nama author tidak boleh kosong.");
+      showNotification("Nama author tidak boleh kosong.", "error");
       return;
     }
     if (
@@ -124,17 +127,19 @@ export default function AuthorPage() {
           d.id !== (editAuthor?.id ?? 0)
       )
     ) {
-      alert("Author dengan nama tersebut sudah ada.");
+      showNotification("Author dengan nama tersebut sudah ada.", "error");
       return;
     }
+    const updatedAuthorName = inputNama.trim();
     setData(
       data.map((d) =>
-        d.id === editAuthor?.id ? { ...d, nama: inputNama.trim() } : d
+        d.id === editAuthor?.id ? { ...d, nama: updatedAuthorName } : d
       )
     );
     setShowEditModal(false);
     setEditAuthor(null);
     setInputNama("");
+    showNotification(`Author "${updatedAuthorName}" berhasil diperbarui.`, "success");
   }
 
   function openDeleteModal(author: Author) {
@@ -144,29 +149,28 @@ export default function AuthorPage() {
 
   function handleDeleteAuthor() {
     if (!deleteAuthor) return;
+    const authorNameToDelete = deleteAuthor.nama;
     setData(data.filter((d) => d.id !== deleteAuthor.id));
     setSelectedIds(selectedIds.filter((id) => id !== deleteAuthor.id));
     setShowDeleteModal(false);
     setDeleteAuthor(null);
+    showNotification(`Author "${authorNameToDelete}" berhasil dihapus.`, "success");
   }
 
   function handleDeleteMultiple() {
     if (selectedIds.length === 0) {
-      alert("Pilih author yang akan dihapus terlebih dahulu.");
+      showNotification("Pilih author yang akan dihapus terlebih dahulu.", "error");
       return;
     }
     setShowDeleteMultipleModal(true);
   }
 
   function confirmDeleteMultiple() {
+    const numDeleted = selectedIds.length;
     setData(data.filter((d) => !selectedIds.includes(d.id)));
     setSelectedIds([]);
     setShowDeleteMultipleModal(false);
-  }
-
-  function goToPage(page: number) {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+    showNotification(`${numDeleted} author berhasil dihapus.`, "success");
   }
 
   return (
@@ -175,14 +179,13 @@ export default function AuthorPage() {
       <div className="flex flex-col flex-1">
         <Header />
         <main className="p-6 overflow-auto">
-          {/* 5. Mengubah semua teks UI dari "Kategori" menjadi "Author" */}
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-semibold text-gray-800">Daftar Author</h1>
             <div className="flex items-center space-x-2">
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium"
               >
                 + Tambah Author
               </button>
@@ -190,20 +193,20 @@ export default function AuthorPage() {
                 type="button"
                 onClick={handleDeleteMultiple}
                 disabled={selectedIds.length === 0}
-                className={`px-4 py-2 rounded ${
+                className={`px-4 py-2 rounded-lg transition-colors shadow-sm font-medium ${
                   selectedIds.length === 0
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-red-600 text-white hover:bg-red-700"
-                } transition-colors`}
+                    : "bg-rose-600 text-white hover:bg-rose-700"
+                }`}
               >
                 Hapus Terpilih
               </button>
             </div>
           </div>
+
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
             <div className="text-gray-700 text-sm">
-              Menampilkan{" "}
-              <span className="font-semibold">{currentData.length}</span> dari{" "}
+              Menampilkan <span className="font-semibold">{currentData.length}</span> dari{" "}
               <span className="font-semibold">{filteredData.length}</span> data
             </div>
             <input
@@ -215,10 +218,7 @@ export default function AuthorPage() {
             />
           </div>
           <div className="mb-4 flex items-center space-x-2">
-            <label
-              htmlFor="itemsPerPage"
-              className="text-black text-sm font-semibold"
-            >
+            <label htmlFor="itemsPerPage" className="text-black text-sm font-semibold">
               Data per halaman:
             </label>
             <select
@@ -234,6 +234,7 @@ export default function AuthorPage() {
               ))}
             </select>
           </div>
+
           <div className="overflow-x-auto bg-white rounded shadow">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-100 border-b border-gray-300">
@@ -242,9 +243,7 @@ export default function AuthorPage() {
                     <input
                       type="checkbox"
                       checked={allSelectedOnPage}
-                      ref={(input) => {
-                        if (input) input.indeterminate = someSelectedOnPage;
-                      }}
+                      ref={(input) => { if (input) input.indeterminate = someSelectedOnPage; }}
                       onChange={toggleSelectAll}
                       aria-label="Select all authors on current page"
                       className="cursor-pointer"
@@ -261,19 +260,13 @@ export default function AuthorPage() {
               <tbody className="divide-y divide-gray-100">
                 {currentData.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="px-6 py-4 whitespace-nowrap text-center text-gray-500"
-                    >
+                    <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-center text-gray-500">
                       Tidak ada data author ditemukan.
                     </td>
                   </tr>
                 ) : (
                   currentData.map((author) => (
-                    <tr
-                      key={author.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
+                    <tr key={author.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                         <input
                           type="checkbox"
@@ -286,21 +279,25 @@ export default function AuthorPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                         {author.nama}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm space-x-2">
-                        <button
-                          onClick={() => openEditModal(author)}
-                          className="text-blue-600 hover:underline"
-                          aria-label={`Edit author ${author.nama}`}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(author)}
-                          className="text-red-600 hover:underline"
-                          aria-label={`Hapus author ${author.nama}`}
-                        >
-                          Hapus
-                        </button>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center space-x-3">
+                          <button
+                            onClick={() => openEditModal(author)}
+                            className="flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors duration-200 text-sm font-medium"
+                            aria-label={`Edit author ${author.nama}`}
+                          >
+                            <HiPencil />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(author)}
+                            className="flex items-center gap-2 px-3 py-1 bg-rose-100 text-rose-700 rounded-md hover:bg-rose-200 transition-colors duration-200 text-sm font-medium"
+                            aria-label={`Hapus author ${author.nama}`}
+                          >
+                            <HiTrash />
+                            Hapus
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -331,31 +328,27 @@ export default function AuthorPage() {
               </button>
             ))}
             <button
-              disabled={currentPage === totalPages}
+              disabled={currentPage === totalPages || totalPages === 0}
               onClick={() => setCurrentPage(currentPage + 1)}
               className={`px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition ${
-                currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
+                currentPage === totalPages || totalPages === 0 ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
               Next
             </button>
           </div>
 
-          {/* Modal Tambah Author */}
+          {/* Modal Tambah */}
           <AnimatePresence>
             {showAddModal && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <motion.div 
+                className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setShowAddModal(false)}
               >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
+                <motion.div 
+                  className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full" 
+                  initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <h3 className="text-lg font-semibold mb-4 text-black">Tambah Author</h3>
@@ -364,19 +357,13 @@ export default function AuthorPage() {
                     placeholder="Nama author"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowAddModal(false)}
-                      className="px-4 py-2 rounded border text-black border-gray-300 hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleAddAuthor}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
+                    <button onClick={handleAddAuthor} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium">
                       Simpan
                     </button>
                   </div>
@@ -385,43 +372,26 @@ export default function AuthorPage() {
             )}
           </AnimatePresence>
 
-          {/* Modal Edit Author */}
+          {/* Modal Edit */}
           <AnimatePresence>
-            {showEditModal && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-30 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowEditModal(false)}
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
+            {showEditModal && editAuthor && (
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => { setShowEditModal(false); setInputNama(""); }}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
                   <h3 className="text-lg font-semibold mb-4 text-black">Edit Author</h3>
                   <input
                     type="text"
                     placeholder="Nama author"
                     value={inputNama}
                     onChange={(e) => setInputNama(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded px-3 py-2 mb-4 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowEditModal(false)}
-                      className="px-4 py-2 rounded border text-black border-gray-300 hover:bg-gray-100"
-                    >
+                    <button onClick={() => { setShowEditModal(false); setInputNama(""); }} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleEditAuthor}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      Simpan
+                    <button onClick={handleEditAuthor} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium">
+                      Simpan Perubahan
                     </button>
                   </div>
                 </motion.div>
@@ -429,41 +399,21 @@ export default function AuthorPage() {
             )}
           </AnimatePresence>
 
-          {/* Modal Hapus Satu Author */}
+          {/* Modal Hapus Satu */}
           <AnimatePresence>
             {showDeleteModal && deleteAuthor && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowDeleteModal(false)}
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-lg text-black font-semibold mb-4">
-                    Konfirmasi Hapus
-                  </h3>
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => setShowDeleteModal(false)}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-lg text-black font-semibold mb-4">Konfirmasi Hapus</h3>
                   <p className="mb-6 text-gray-700">
-                    Apakah yakin ingin menghapus author{" "}
-                    <strong>{deleteAuthor.nama}</strong>?
+                    Apakah yakin ingin menghapus author <strong>{deleteAuthor.nama}</strong>?
                   </p>
                   <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => setShowDeleteModal(false)}
-                      className="px-5 py-2 rounded border border-gray-300 text-black hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowDeleteModal(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={handleDeleteAuthor}
-                      className="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700"
-                    >
+                    <button onClick={handleDeleteAuthor} className="bg-rose-600 text-white px-5 py-2 rounded-lg hover:bg-rose-700 transition-colors shadow-sm font-medium">
                       Hapus
                     </button>
                   </div>
@@ -472,41 +422,21 @@ export default function AuthorPage() {
             )}
           </AnimatePresence>
 
-          {/* Modal Hapus Multiple Author */}
+          {/* Modal Hapus Multiple */}
           <AnimatePresence>
             {showDeleteMultipleModal && (
-              <motion.div
-                className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowDeleteMultipleModal(false)}
-              >
-                <motion.div
-                  className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <h3 className="text-lg text-black font-semibold mb-4">
-                    Konfirmasi Hapus
-                  </h3>
+              <motion.div className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-50" // Latar belakang diubah
+                onClick={() => setShowDeleteMultipleModal(false)}>
+                <motion.div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-lg text-black font-semibold mb-4">Konfirmasi Hapus</h3>
                   <p className="mb-6 text-gray-700">
-                    Apakah yakin ingin menghapus{" "}
-                    <strong>{selectedIds.length}</strong> author yang dipilih?
+                    Apakah yakin ingin menghapus <strong>{selectedIds.length}</strong> author yang dipilih?
                   </p>
                   <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => setShowDeleteMultipleModal(false)}
-                      className="px-5 py-2 rounded border border-gray-300 text-black hover:bg-gray-100"
-                    >
+                    <button onClick={() => setShowDeleteMultipleModal(false)} className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors shadow-sm font-medium">
                       Batal
                     </button>
-                    <button
-                      onClick={confirmDeleteMultiple}
-                      className="bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700"
-                    >
+                    <button onClick={confirmDeleteMultiple} className="bg-rose-600 text-white px-5 py-2 rounded-lg hover:bg-rose-700 transition-colors shadow-sm font-medium">
                       Hapus
                     </button>
                   </div>
@@ -514,6 +444,46 @@ export default function AuthorPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          
+          {/* --- Modal Notifikasi (Error/Success) --- */}
+          <AnimatePresence>
+            {showNotificationModal && (
+              <motion.div
+                className="fixed inset-0 bg-transparent bg-opacity-25 flex items-center justify-center z-[100]" // z-index lebih tinggi
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowNotificationModal(false)}
+              >
+                <motion.div
+                  className={`bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center mx-4
+                    border-t-4 ${notificationType === 'error' ? 'border-red-500' : 'border-green-500'}`}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.7, opacity: 0 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {notificationType === 'error' ? (
+                    <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                  ) : (
+                    <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                  )}
+                  <h3 className={`text-xl font-semibold mb-3 ${notificationType === 'error' ? 'text-red-600' : 'text-green-600'}`}>
+                    {notificationType === 'error' ? 'Terjadi Kesalahan' : 'Berhasil!'}
+                  </h3>
+                  <p className="text-gray-700 mb-6">{notificationMessage}</p>
+                  <button
+                    onClick={() => setShowNotificationModal(false)}
+                    className={`w-full px-4 py-2 rounded-lg text-white font-medium transition-colors
+                      ${notificationType === 'error' ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+                  >
+                    Tutup
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </main>
       </div>
     </div>

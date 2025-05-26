@@ -35,7 +35,6 @@ export default function Page() {
         <h1 className="text-3xl font-semibold text-gray-900 mb-4 text-center">
           Profile Mahasiswa
         </h1>
-        <p className="text-center text-gray-700 mb-6 font-medium">ID: {id}</p>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="flex justify-center mb-6">
             <div className="relative w-28 h-28">
