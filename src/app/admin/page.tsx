@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Header from "../components/HeaderAdmin";
-import Sidebar from "../components/sidebar";
+import Header from "@/components/HeaderAdmin";
+import Sidebar from "@/components/sidebar";
 import Link from "next/link";
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 import { FiCamera } from "react-icons/fi";

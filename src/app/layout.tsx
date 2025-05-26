@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "E-Pustaka • Peminjaman Buku Online & Offline",
-  description: "Platform peminjaman buku secara online maupun offline untuk Mahasiswa dan Admin.",
+  title: "E-Pustaka • Perpusatakaan Digital EEPIS",
+  description: "Platform peminjaman buku secara online maupun offline untuk civitas akademika PENS.",
 };
 
 export default function RootLayout({

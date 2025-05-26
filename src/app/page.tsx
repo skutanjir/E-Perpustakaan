@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect, JSX} from "react";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
@@ -10,11 +10,7 @@ const SERVICES = [
   { title: "Pengembalian Offline", desc: "Kembalikan buku secara langsung di lokasi perpustakaan terdekat." },
   { title: "Pengingat Jatuh Tempo", desc: "Dapatkan notifikasi sebelum waktu pengembalian tiba." },
 ];
-const RECOMMENDATIONS = [
-  { title: "Seni Hidup Minimalis", author: "Francine Jay" },
-  { title: "Filosofi Teras", author: "Henry Menampiring" },
-  { title: "Selamat Tinggal", author: "Tere Liye" },
-];
+
 const TEAM = [
   { name: "Yosevian Misyael", role: "CEO & Founder", img: "/team1.jpg" },
   { name: "Oktavia Ramadhani", role: "Designer", img: "/team2.jpg" },
