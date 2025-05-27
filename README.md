@@ -42,11 +42,14 @@ cd E-Perpustakaan
 # Install dependensi
 npm install
 
-# Jalankan mode development
-npm run dev
+# Jalankan mode development frontend di port 8080 (Linux/macOS)
+PORT=8080 npm run dev
+
+# Jika di Windows PowerShell
+$env:PORT=8080; npm run dev
 ```
 
-Buka [http://localhost:3000](http://localhost:3000) untuk melihat aplikasi.
+Buka [http://localhost:8080](http://localhost:8080) untuk melihat aplikasi.
 
 ---
 
