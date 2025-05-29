@@ -36,17 +36,17 @@ export default function SidebarAdmin() {
       label: "Home",
     },
     {
-      href: "/admin/tambah-buku",
+      href: "/admin/books/add",
       icon: <PlusIcon className="w-6 h-6 text-gray-700" />,
       label: "Tambah Buku",
     },
     {
-      href: "/admin/kategori",
+      href: "/admin/categories",
       icon: <BookOpenIcon className="w-6 h-6 text-gray-700" />,
       label: "Tambah Kategori",
     },
     {
-      href: "/admin/author",
+      href: "/admin/authors",
       icon: <UserPlusIcon className="w-6 h-6 text-gray-700" />,
       label: "Tambah Author",
     },
