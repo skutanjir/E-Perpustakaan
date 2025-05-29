@@ -234,7 +234,7 @@ export default function MahasiswaRegister(): JSX.Element {
 
           <p className="text-center text-sm mt-4 text-gray-700">
             Sudah memiliki akun?{" "}
-            <a href="/mahasiswa/login" className="text-indigo-600 font-medium hover:underline">
+            <a href="/auth/user/login" className="text-indigo-600 font-medium hover:underline">
               Masuk Sekarang
             </a>
           </p>

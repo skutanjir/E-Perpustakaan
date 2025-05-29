@@ -1,415 +1,493 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { JSX, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/HeaderAdmin";
 import Sidebar from "@/components/sidebar";
 import Link from "next/link";
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 import { FiCamera } from "react-icons/fi";
+import { get, post, apiRequest, ApiErrorResponse } from "@/lib/api/apiService";
+import type { Book } from "@/types";
 
-// --- INTERFACES ---
-interface Book {
-  id: number;
-  title: string;
+interface AdminBook extends Book {}
+
+interface BorrowingRecord {
+  id: string | number; 
+  book: { isbn: string; title: string; };
+  user: { id: string; name: string; nrp: string; };
+  borrowDate: string;
+  returnDate: string;
+  returnedDate?: string | null; 
+  isLate?: boolean;
 }
 
-interface Loan {
-  id: number;
-  title: string;
-  bookId: string;
-  name: string;
-  nrp: string;
-  tglPinjam: string;
-  tglKembali: string;
+interface LibraryStats {
+  booksTotal: number;
+  borrowedTotal: number;
+  averageBorrowedBooksPerMonth: number;
+  notReturnedCount: number;
 }
 
-interface Return extends Loan {
-  tglDikembalikan: string;
-  isLate: boolean;
+interface PaginatedBooksResponse {
+  data: AdminBook[];
+  pagination: {
+    totalPages: number;
+    currentPage: number;
+  };
 }
 
-// --- DATA AWAL (DUMMY DATA) ---
-const initialBooks: Book[] = [
-    { id: 1, title: "Seni Memahami Hidup Minimalis" },
-    { id: 2, title: "Dia adalah Dilanku Tahun 1990" },
-    { id: 3, title: "Filosofi Teras" },
-    { id: 4, title: "Selamat Tinggal" },
-    { id: 5, title: "Timun Jelita" },
-    { id: 6, title: "Tanah Para Bandit" },
-    { id: 7, title: "Atmosphere" },
-];
+type ActiveTab = "buku" | "peminjaman" | "pengembalian";
 
-const initialPeminjamans: Loan[] = [
-  { id: 1, title: "Kata", bookId: "9786020646200", name: "Nasya", nrp: "3124500000", tglPinjam: "2025-05-10", tglKembali: "2025-05-17" },
-  { id: 2, title: "Dilan", bookId: "9786027870813", name: "Kiara", nrp: "3124600000", tglPinjam: "2025-05-20", tglKembali: "2025-05-27" },
-  { id: 3, title: "Filosofi Teras", bookId: "9786020383", name: "Budi", nrp: "3124700000", tglPinjam: "2025-05-15", tglKembali: "2025-05-22" },
-];
-
-const initialPengembalians: Return[] = [
-  { id: 1, title: "Laskar Pelangi", bookId: "9789793062798", name: "Sari", nrp: "3124800000", tglPinjam: "2025-05-01", tglKembali: "2025-05-08", tglDikembalikan: "2025-05-10", isLate: true },
-  { id: 2, title: "Bumi Manusia", bookId: "9789799731234", name: "Joko", nrp: "3124900000", tglPinjam: "2025-05-05", tglKembali: "2025-05-12", tglDikembalikan: "2025-05-11", isLate: false },
-];
-
-export default function Page() {
-  // State untuk data dan UI
-  const [activeTab, setActiveTab] = useState<"buku" | "peminjaman" | "pengembalian">("buku");
+export default function AdminDashboardPage(): JSX.Element {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("buku");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(3);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   
-  // State untuk data yang bisa berubah
-  const [books, setBooks] = useState<Book[]>(initialBooks);
-  const [peminjamans, setPeminjamans] = useState<Loan[]>(initialPeminjamans);
-  const [pengembalians, setPengembalians] = useState<Return[]>(initialPengembalians);
+  const [booksData, setBooksData] = useState<AdminBook[]>([]);
+  const [allBorrowingRecords, setAllBorrowingRecords] = useState<BorrowingRecord[]>([]); 
 
-  // State untuk filter dan search
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingTabData, setLoadingTabData] = useState(true);
+  const [tabError, setTabError] = useState<string | null>(null);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [returnFilter, setReturnFilter] = useState<"all" | "late" | "ontime">("all");
   
-  // State untuk modal
   const [showReturnModal, setShowReturnModal] = useState(false);
-  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [selectedLoan, setSelectedLoan] = useState<BorrowingRecord | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  // Fungsi untuk memfilter dan mencari data sesuai tab aktif
-  const filteredAndSearchedData = () => {
-    let currentData: any[] = [];
-    if (activeTab === 'buku') {
-      currentData = books.filter(b => b.title.toLowerCase().includes(searchTerm.toLowerCase()));
-    } else if (activeTab === 'peminjaman') {
-      currentData = peminjamans.filter(p => 
-        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.nrp.includes(searchTerm)
-      );
-    } else if (activeTab === 'pengembalian') {
-      let filtered = pengembalians;
-      if (returnFilter === 'late') {
-        filtered = pengembalians.filter(p => p.isLate);
-      } else if (returnFilter === 'ontime') {
-        filtered = pengembalians.filter(p => !p.isLate);
-      }
-      currentData = filtered.filter(p => 
-        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.nrp.includes(searchTerm)
-      );
-    }
-    return currentData;
-  };
+  const [libraryStats, setLibraryStats] = useState<LibraryStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
-  const data = filteredAndSearchedData();
-  const totalPages = Math.ceil(data.length / itemsPerPage);
-  const pagedData = data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const fetchLibraryStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      const response = await get<{ data: LibraryStats }>("/borrowings/library/stats"); 
+      setLibraryStats(response.data);
+    } catch (error: any) {
+      const apiErr = error as ApiErrorResponse;
+      setStatsError(apiErr.error || apiErr.message || "Gagal memuat statistik.");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    fetchLibraryStats();
+  }, [fetchLibraryStats]);
+
+  const fetchDataForTab = useCallback(async (tab: ActiveTab, page: number, limit: number, search: string) => {
+    setLoadingTabData(true);
+    setTabError(null);
+    try {
+      if (tab === "buku") {
+        const params = { page: String(page), pageSize: String(limit), ...(search && { title: search }) };
+        const response = await get<PaginatedBooksResponse>("/books/search", { params });
+        setBooksData(response.data);
+        setTotalPages(response.pagination.totalPages);
+        setCurrentPage(response.pagination.currentPage > 0 ? response.pagination.currentPage : 1);
+      } else if (tab === "peminjaman" || tab === "pengembalian") {
+        const response = await get<{ data: BorrowingRecord[] }>("/borrowings"); 
+        setAllBorrowingRecords(response.data);
+      }
+    } catch (err: any) {
+      const apiErr = err as ApiErrorResponse;
+      setTabError(apiErr.error || apiErr.message || `Gagal memuat data ${tab}.`);
+      setBooksData([]); setAllBorrowingRecords([]); 
+      setTotalPages(0);
+    } finally {
+      setLoadingTabData(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    if (activeTab === "buku") {
+      fetchDataForTab("buku", currentPage, itemsPerPage, searchTerm);
+    }
+  }, [activeTab, currentPage, itemsPerPage, searchTerm, fetchDataForTab]);
+  
+  useEffect(() => {
+    if ((activeTab === "peminjaman" || activeTab === "pengembalian") && allBorrowingRecords.length === 0 && !loadingTabData) {
+      fetchDataForTab(activeTab, 1, 0, "");
+    }
+  }, [activeTab, allBorrowingRecords.length, loadingTabData, fetchDataForTab]);
+  
+  const processedClientSideData = useMemo(() => {
+    if (activeTab === 'buku') {
+      return booksData;
+    }
+    let filteredRecords: BorrowingRecord[] = [];
+    if (activeTab === 'peminjaman') {
+      filteredRecords = allBorrowingRecords.filter(record => record.returnedDate === null || record.returnedDate === undefined || record.returnedDate === "");
+    } else if (activeTab === 'pengembalian') {
+      filteredRecords = allBorrowingRecords.filter(record => record.returnedDate && record.returnedDate !== "")
+        .map(record => ({
+          ...record,
+          isLate: record.returnedDate && new Date(record.returnedDate) > new Date(record.returnDate)
+        }));
+      if (returnFilter === 'late') {
+        filteredRecords = filteredRecords.filter(p => p.isLate);
+      } else if (returnFilter === 'ontime') {
+        filteredRecords = filteredRecords.filter(p => !p.isLate);
+      }
+    }
+    if (searchTerm) {
+      return filteredRecords.filter(p =>
+          (p.book?.title?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+          (p.user?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+          (p.user?.nrp || "").includes(searchTerm.toLowerCase())
+      );
+    }
+    return filteredRecords;
+  }, [activeTab, searchTerm, returnFilter, allBorrowingRecords, booksData]);
+
+  useEffect(() => {
+    if (activeTab === "peminjaman" || activeTab === "pengembalian") {
+      const newTotalPages = Math.ceil(processedClientSideData.length / itemsPerPage);
+      setTotalPages(newTotalPages);
+      if (currentPage > newTotalPages) {
+        setCurrentPage(newTotalPages > 0 ? newTotalPages : 1);
+      } else if (newTotalPages === 0 && processedClientSideData.length > 0) {
+         setCurrentPage(1); 
+      } else if (newTotalPages === 0) {
+        setCurrentPage(1);
+      }
+    }
+  }, [activeTab, processedClientSideData, itemsPerPage, currentPage]);
+  
+  const pagedData = useMemo(() => {
+    if (activeTab === 'buku') {
+      return booksData; 
+    }
+    return processedClientSideData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [activeTab, booksData, processedClientSideData, currentPage, itemsPerPage]);
+
+   useEffect(() => {
     setCurrentPage(1);
-    setSearchTerm("");
-    setReturnFilter("all");
-  }, [activeTab]);
+  }, [activeTab, searchTerm, returnFilter]);
 
-  const openReturnModal = (loan: Loan) => {
-    setSelectedLoan(loan);
-    setShowReturnModal(true);
-  };
+  const openReturnModal = useCallback((loan: BorrowingRecord) => { 
+    setSelectedLoan(loan); 
+    setShowReturnModal(true); 
+  }, []);
 
-  // Fungsi untuk memproses pengembalian buku
-  const handleReturnBook = () => {
+  const handleReturnBook = async () => {
     if (!selectedLoan) return;
-    setPeminjamans(peminjamans.filter(p => p.id !== selectedLoan.id));
-    const returnDate = new Date();
-    const dueDate = new Date(selectedLoan.tglKembali);
-    const newReturn: Return = {
-      ...selectedLoan,
-      id: pengembalians.length + 1,
-      tglDikembalikan: returnDate.toISOString().split('T')[0],
-      isLate: returnDate > dueDate,
-    };
-    setPengembalians([newReturn, ...pengembalians]);
-    setShowReturnModal(false);
-    setSelectedLoan(null);
+    setLoadingTabData(true); 
+    try {
+      await apiRequest('patch', `/borrowings/${selectedLoan.id}`, {});
+      alert("Buku berhasil dikembalikan!");
+      await fetchLibraryStats(); 
+      const currentData = await get<{ data: BorrowingRecord[] }>("/borrowings");
+      setAllBorrowingRecords(currentData.data);
+    } catch (error: any) {
+        const apiError = error as ApiErrorResponse;
+        alert(`Gagal mengembalikan buku: ${apiError.error || apiError.message || "Error tidak diketahui"}`);
+    } finally {
+        setShowReturnModal(false);
+        setSelectedLoan(null);
+        setLoadingTabData(false);
+    }
   };
   
-  // Hook untuk mengelola siklus hidup QR Code Scanner
   useEffect(() => {
-    if (!isScannerOpen) {
-      return;
-    }
-
+    if (!isScannerOpen) return;
     const qrCodeRegionId = "qr-reader";
-    const html5QrCode = new Html5Qrcode(qrCodeRegionId);
+    let html5QrCodeInstance: Html5Qrcode | null = null;
+    const readerElement = document.getElementById(qrCodeRegionId);
+
+    if (!readerElement) { 
+      setIsScannerOpen(false); 
+      return; 
+    }
+    html5QrCodeInstance = new Html5Qrcode(qrCodeRegionId);
 
     const onScanSuccess = (decodedText: string) => {
-      html5QrCode.pause();
-      const scannedId = decodedText;
-      const foundLoan = peminjamans.find(p => p.id.toString() === scannedId);
+      const scannedId = decodedText.trim();
       
-      if (foundLoan) {
-        setIsScannerOpen(false);
-        openReturnModal(foundLoan);
+      const loanToReturn = allBorrowingRecords.find(record => {
+        const recordIdAsString = String(record.id).trim(); 
+        const isActiveLoan = record.returnedDate === null || record.returnedDate === undefined || record.returnedDate === "";
+        const idMatches = recordIdAsString === scannedId;
+        return isActiveLoan && idMatches;
+      });
+      
+      if (loanToReturn) {
+        setIsScannerOpen(false); 
+        openReturnModal(loanToReturn);
       } else {
-        alert(`Peminjaman dengan ID "${scannedId}" tidak ditemukan.`);
-        setTimeout(() => {
-          if (html5QrCode.getState() === Html5QrcodeScannerState.PAUSED) {
-            html5QrCode.resume();
-          }
-        }, 1000);
+        const anyLoanWithId = allBorrowingRecords.find(record => String(record.id).trim() === scannedId);
+        if (anyLoanWithId) {
+          alert(`Peminjaman dengan ID "${scannedId}" ditemukan, tetapi buku ini sudah dikembalikan atau statusnya tidak aktif.`);
+        } else {
+          alert(`Peminjaman dengan ID "${scannedId}" tidak ditemukan sama sekali dalam data.`);
+        }
       }
     };
     
-    const startScanner = async () => {
-      try {
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          onScanSuccess,
-          (errorMessage) => {}
-        );
-      } catch (err) {
-        console.error("Gagal memulai QR scanner:", err);
-        alert("Tidak dapat memulai kamera. Pastikan Anda telah memberikan izin pada browser.");
-        setIsScannerOpen(false);
-      }
-    };
-    
-    startScanner();
+    const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+    if (html5QrCodeInstance) {
+        html5QrCodeInstance.start({ facingMode: "environment" }, config, onScanSuccess, (errorMessage) => {})
+        .catch(err => {
+            alert("Gagal memulai kamera. Pastikan izin kamera sudah diberikan dan tidak ada aplikasi lain yang menggunakan kamera.");
+            setIsScannerOpen(false);
+        });
+    }
 
     return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(err => {
-          console.error("Gagal menghentikan QR scanner dengan benar:", err);
-        });
+      if (html5QrCodeInstance) {
+        if (html5QrCodeInstance.isScanning) {
+          html5QrCodeInstance.stop().catch(err => {});
+        }
+        html5QrCodeInstance.clear().catch(err => {});
+        html5QrCodeInstance = null;
       }
     };
-  }, [isScannerOpen, peminjamans]);
+  }, [isScannerOpen, allBorrowingRecords, openReturnModal]);
+
+  const statsCards = [
+    { label: "Jumlah Buku", value: statsLoading ? "..." : libraryStats?.booksTotal ?? "N/A" },
+    { label: "Sedang Dipinjam", value: statsLoading ? "..." : libraryStats?.borrowedTotal ?? "N/A" },
+    { label: "Rata-rata Traffic/Bulan", value: statsLoading ? "..." : libraryStats?.averageBorrowedBooksPerMonth ?? "N/A" },
+    { label: "Buku Telat", value: statsLoading ? "..." : libraryStats?.notReturnedCount ?? "N/A", isHighlight: true },
+  ];
 
   return (
     <div className="min-h-screen flex">
       <Sidebar />
-      <div className="flex-1 bg-gray-50">
+      <div className="flex-1 bg-gray-50 overflow-y-auto">
         <Header />
-        <main className="px-8 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: "Jumlah Buku", value: books.length },
-              { label: "Sedang Dipinjam", value: peminjamans.length },
-              { label: "Rata-rata Traffic/Bulan", value: 15 },
-              { label: "Buku Telat", value: pengembalians.filter(r => r.isLate).length, isHighlight: true },
-            ].map(({ label, value, isHighlight }, i) => (
-              <div
-                key={i}
-                className={`relative bg-white rounded-2xl shadow-md p-4 border ${
-                  isHighlight ? "border-red-400" : "border-gray-300"
-                }`}
-              >
-                <h3 className="text-sm text-gray-500">{label}</h3>
-                <p className={`text-2xl font-bold ${isHighlight ? "text-red-700" : "text-gray-800"}`}>
-                  {value}
-                </p>
+        <main className="px-4 sm:px-6 md:px-8 py-6">
+          {statsError && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{statsError}</div>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {statsCards.map(({ label, value, isHighlight }, i) => (
+              <div key={i} className={`relative bg-white rounded-xl shadow-lg p-4 sm:p-5 border ${ isHighlight ? "border-red-500 shadow-red-200" : "border-gray-200" }`}>
+                <h3 className="text-xs sm:text-sm text-gray-500 mb-1 truncate">{label}</h3>
+                <p className={`text-xl sm:text-2xl font-bold ${isHighlight ? "text-red-600" : "text-gray-800"}`}>{value}</p>
               </div>
             ))}
           </div>
 
-          <nav className="flex gap-4 mb-8">
-            {["buku", "peminjaman", "pengembalian"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`px-6 py-2 rounded-full font-medium transition ${
-                  activeTab === tab ? "bg-[#678D7D] text-white" : "border border-[#678D7D] text-[#678D7D]"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </nav>
-          
-          <div className="bg-white border border-gray-300 rounded-2xl p-4 shadow-sm">
-            <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
-              <div className="flex w-full md:w-auto gap-2">
-                <input
-                  type="text"
-                  placeholder={`Cari di ${activeTab}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-[#678D7D]"
-                />
-                {activeTab === 'peminjaman' && (
-                  <button
-                    onClick={() => setIsScannerOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#678D7D] text-white rounded-lg hover:bg-[#5a776d] transition"
-                  >
-                    <FiCamera />
-                    <span>Scan</span>
-                  </button>
-                )}
-              </div>
-              
-              {activeTab === 'pengembalian' && (
-                <div className="flex gap-2">
-                  <button onClick={() => setReturnFilter('all')} className={`px-4 py-1 rounded-full text-sm ${returnFilter === 'all' ? 'bg-[#678D7D] text-white' : 'bg-gray-200 text-black'}`}>Semua</button>
-                  <button onClick={() => setReturnFilter('late')} className={`px-4 py-1 rounded-full text-sm ${returnFilter === 'late' ? 'bg-red-500 text-white' : 'bg-gray-200 text-black'}`}>Terlambat</button>
-                  <button onClick={() => setReturnFilter('ontime')} className={`px-4 py-1 rounded-full text-sm ${returnFilter === 'ontime' ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}>Tepat Waktu</button>
-                </div>
-              )}
-            </div>
-            
-            {activeTab === "buku" && (
-                <div>
-                  <h1 className="text-2xl font-semibold text-gray-800 mb-4">List Buku</h1>
-                   <ul className="space-y-3">
-                     {pagedData.map((book) => (
-                       <li key={book.id} className="flex items-center justify-between px-4 py-3 rounded-md bg-gray-50 shadow-sm">
-                         <span className="text-gray-900">{book.id}. {book.title}</span>
-                         <Link href={`/admin/${book.id}/detailbuku`}>
-                            <button className="px-3 py-1 bg-[#678D7D] text-white rounded-full hover:bg-[#5a776d] transition">Detail</button>
-                         </Link>
-                       </li>
-                     ))}
-                   </ul>
-                </div>
-            )}
-            
-            {activeTab === "peminjaman" && (
-              <div className="overflow-x-auto">
-                <h1 className="text-2xl font-semibold text-gray-800 mb-4">List Peminjaman</h1>
-                <table className="min-w-full table-auto border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-300">
-                        {/* PERUBAHAN DI SINI: Kolom "ID Pinjam" dihilangkan dari header */}
-                        {['Judul Buku', 'Nama', 'NRP', 'Tgl Pinjam', 'Tgl Kembali', 'Aksi'].map(h => <th key={h} className="px-4 py-2 text-left text-gray-800 font-semibold">{h}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedData.map((p: Loan) => (
-                      <tr key={p.id} className="bg-white border-b">
-                        {/* PERUBAHAN DI SINI: Kolom "ID Pinjam" tidak dirender, tapi kolom tanggal ditambahkan */}
-                        <td className="px-4 py-2 text-gray-900">{p.title}</td>
-                        <td className="px-4 py-2 text-gray-900">{p.name}</td>
-                        <td className="px-4 py-2 text-gray-900">{p.nrp}</td>
-                        <td className="px-4 py-2 text-gray-900">{p.tglPinjam}</td>
-                        <td className="px-4 py-2 text-gray-900">{p.tglKembali}</td>
-                        <td className="px-4 py-2">
-                          <button onClick={() => openReturnModal(p)} className="px-3 py-1 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition text-sm">
-                            Kembalikan
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <nav className="flex flex-wrap gap-2 sm:gap-4 mb-6 sm:mb-8">
+             {(["buku", "peminjaman", "pengembalian"] as const).map((tab) => (
+               <button
+                 key={tab}
+                 onClick={() => { setActiveTab(tab);}}
+                 className={`px-4 py-2 sm:px-5 rounded-full font-medium transition text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                   activeTab === tab ? "bg-[#678D7D] text-white shadow-md focus:ring-[#527064]" : "border border-[#678D7D] text-[#678D7D] hover:bg-[#eaf0ee] focus:ring-[#a5c2b9]"
+                 }`}
+               >
+                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
+               </button>
+             ))}
+           </nav>
+           
+           <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-4 sm:p-6">
+             <div className="flex flex-col md:flex-row items-center justify-between mb-5 gap-3 md:gap-4">
+               <div className="flex w-full md:max-w-md items-center gap-2">
+                 <input
+                   type="text"
+                   placeholder={activeTab === "buku" ? "Cari berdasarkan judul buku..." : `Cari berdasarkan judul, nama, atau NRP...`}
+                   value={searchTerm}
+                   onChange={(e) => { setSearchTerm(e.target.value);}}
+                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#678D7D] focus:border-transparent"
+                 />
+                 {activeTab === 'peminjaman' && (
+                   <button
+                     onClick={() => setIsScannerOpen(true)}
+                     title="Scan QR Code Buku"
+                     className="flex-shrink-0 flex items-center gap-2 px-3 py-2.5 bg-[#678D7D] text-white rounded-lg hover:bg-[#5a776d] transition focus:outline-none focus:ring-2 focus:ring-[#527064]"
+                   >
+                     <FiCamera size={18}/>
+                     <span className="hidden sm:inline text-sm">Scan</span>
+                   </button>
+                 )}
+               </div>
+               
+               {activeTab === 'pengembalian' && (
+                 <div className="flex gap-2 flex-wrap justify-start md:justify-end w-full md:w-auto mt-3 md:mt-0">
+                   <button onClick={() => {setReturnFilter('all');}} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm ${returnFilter === 'all' ? 'bg-[#678D7D] text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Semua</button>
+                   <button onClick={() => {setReturnFilter('late');}} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm ${returnFilter === 'late' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Terlambat</button>
+                   <button onClick={() => {setReturnFilter('ontime');}} className={`px-3 py-1.5 rounded-full text-xs sm:text-sm ${returnFilter === 'ontime' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Tepat Waktu</button>
+                 </div>
+               )}
+             </div>
+             
+            {loadingTabData && <div className="text-center text-gray-500 py-10">Memuat data...</div>}
+            {tabError && <div className="text-center text-red-500 py-10 bg-red-50 rounded-md">{tabError}</div>}
+
+            {!loadingTabData && !tabError && pagedData.length === 0 && (
+                <div className="text-center text-gray-500 py-10">Tidak ada data untuk ditampilkan.</div>
             )}
 
-            {activeTab === "pengembalian" && (
-              <div className="overflow-x-auto">
-                <h1 className="text-2xl font-semibold text-gray-800 mb-4">List Pengembalian</h1>
-                <table className="min-w-full table-auto border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-300">
-                        {['Judul Buku', 'Nama', 'NRP', 'Tgl Kembali', 'Tgl Dikembalikan', 'Status'].map(h => <th key={h} className="px-4 py-2 text-left text-gray-800 font-semibold">{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagedData.map((p: Return) => (
-                        <tr key={p.id} className="bg-white border-b">
-                          <td className="px-4 py-2 text-gray-900">{p.title}</td>
-                          <td className="px-4 py-2 text-gray-900">{p.name}</td>
-                          <td className="px-4 py-2 text-gray-900">{p.nrp}</td>
-                          <td className="px-4 py-2 text-gray-900">{p.tglKembali}</td>
-                          <td className="px-4 py-2 text-gray-900">{p.tglDikembalikan}</td>
-                          <td className="px-4 py-2">
-                             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${p.isLate ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>
-                                {p.isLate ? "Terlambat" : "Tepat Waktu"}
-                             </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                </table>
-              </div>
+            {!loadingTabData && !tabError && pagedData.length > 0 && (
+                <>
+                    {activeTab === "buku" && (
+                        <div>
+                          <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4">List Buku</h2>
+                            <ul className="space-y-2.5">
+                              {pagedData.map((book: AdminBook) => ( 
+                                <li key={book.isbn} className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 rounded-lg bg-gray-50 shadow hover:shadow-md transition-shadow">
+                                  <span className="text-gray-800 text-sm mb-2 sm:mb-0 sm:text-base flex-grow">{book.title} (ISBN: {book.isbn})</span>
+                                  <Link href={`/admin/books/${book.isbn}/detail`}> 
+                                    <button className="px-4 py-1.5 bg-[#5a776d] text-white rounded-full hover:bg-[#49625a] transition text-xs sm:text-sm w-full sm:w-auto">Detail</button>
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                        </div>
+                    )}
+                    
+                    {activeTab === "peminjaman" && (
+                      <div className="overflow-x-auto">
+                        <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4">List Peminjaman Aktif</h2>
+                        <table className="min-w-full w-full table-auto border-collapse">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              {['ID', 'Judul Buku', 'Peminjam', 'NRP', 'Pinjam', 'Kembali', 'Aksi'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {pagedData.map((p: BorrowingRecord) => ( 
+                              <tr key={p.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.id}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.book.title}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.user.name}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.user.nrp}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{new Date(p.borrowDate).toLocaleDateString('id-ID')}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{new Date(p.returnDate).toLocaleDateString('id-ID')}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                  <button onClick={() => openReturnModal(p)} className="px-3 py-1 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition text-xs">
+                                    Kembalikan
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {activeTab === "pengembalian" && (
+                      <div className="overflow-x-auto">
+                        <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4">List Pengembalian</h2>
+                        <table className="min-w-full w-full table-auto border-collapse">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                {['ID', 'Judul Buku', 'Peminjam', 'NRP', 'Jatuh Tempo', 'Dikembalikan', 'Status'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {pagedData.map((p: BorrowingRecord) => ( 
+                                <tr key={p.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.id}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.book.title}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.user.name}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.user.nrp}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{new Date(p.returnDate).toLocaleDateString('id-ID')}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{p.returnedDate ? new Date(p.returnedDate).toLocaleDateString('id-ID') : '-'}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ (p.isLate) ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                                        { (p.isLate) ? "Terlambat" : "Tepat Waktu"}
+                                      </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                        </table>
+                      </div>
+                    )}
+                </>
             )}
-            
-            <div className="mt-6 flex justify-between items-center">
-                <div className="flex items-center space-x-3 text-black">
-                    <label htmlFor="itemsPerPage" className="text-sm font-medium">Data per halaman:</label>
-                    <select id="itemsPerPage" className="border border-gray-300 rounded px-2 py-1 text-black" value={itemsPerPage} onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}>
-                      {[3, 5, 10].map((num) => (<option key={num} value={num}>{num}</option>))}
-                    </select>
+             
+             {!loadingTabData && !tabError && totalPages > 0 && (
+                <div className="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor="itemsPerPage" className="text-sm font-medium text-gray-700">Data per halaman:</label>
+                        <select 
+                            id="itemsPerPage" 
+                            className="border border-gray-300 rounded-md px-2 py-1.5 text-gray-700 focus:ring-1 focus:ring-[#678D7D] focus:border-[#678D7D] text-sm"
+                            value={itemsPerPage} 
+                            onChange={(e) => { setItemsPerPage(parseInt(e.target.value));}}
+                        >
+                          {[5, 10, 15, 20].map((num) => (<option key={num} value={num}>{num}</option>))}
+                        </select>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                        <button 
+                            disabled={currentPage === 1} 
+                            onClick={() => setCurrentPage(c => Math.max(1, c - 1))} 
+                            className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        > Prev </button>
+                        <span className="px-2 py-1.5 text-sm text-gray-700">
+                            Hal {currentPage} dari {totalPages}
+                        </span>
+                        <button 
+                            disabled={currentPage === totalPages || totalPages === 0} 
+                            onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} 
+                            className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        > Next </button>
+                    </div>
                 </div>
-                <div className="flex justify-end space-x-2">
-                    <button disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)} className="px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button key={page} onClick={() => setCurrentPage(page)} className={`px-3 py-1 rounded border ${currentPage === page ? "bg-black text-white" : "border-black text-black hover:bg-black hover:text-white"} transition`}>{page}</button>
-                    ))}
-                    <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(currentPage + 1)} className="px-3 py-1 rounded border border-black text-black hover:bg-black hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-                </div>
-            </div>
-          </div>
+             )}
+           </div>
         </main>
       </div>
 
       <AnimatePresence>
         {isScannerOpen && (
           <motion.div
-            className="fixed inset-0 bg-transparent bg-opacity-70 flex flex-col items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center z-[100] p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
-            <div className="bg-white p-4 rounded-lg shadow-xl w-11/12 max-w-md">
-              <div id="qr-reader" className="w-full"></div>
+            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-2xl w-full max-w-xs sm:max-w-sm md:max-w-md">
+              <div id="qr-reader" className="w-full aspect-[1/1] bg-gray-100 rounded-lg overflow-hidden border border-gray-300"></div>
             </div>
-            <p className="text-black mt-4">Arahkan kamera ke QR Code peminjaman</p>
+            <p className="text-white mt-5 text-center text-sm sm:text-base">Arahkan kamera ke QR Code</p>
             <button
               onClick={() => setIsScannerOpen(false)}
-              className="mt-4 px-6 py-2 bg-white text-black rounded-lg"
-            >
-              Batal
-            </button>
+              className="mt-5 px-8 py-2.5 bg-white text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-200 transition"
+            > Batal </button>
           </motion.div>
         )}
       </AnimatePresence>
-
+      
       <AnimatePresence>
         {showReturnModal && selectedLoan && (
           <motion.div
-            className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowReturnModal(false)}
+            className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-xl shadow-2xl p-6 sm:p-8 max-w-md w-full"
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
             >
-              <h3 className="text-xl font-bold mb-4 text-gray-900">Konfirmasi Pengembalian Buku</h3>
-              <div className="space-y-2 text-gray-700">
-                <p><strong>Judul Buku:</strong> {selectedLoan.title}</p>
-                <p><strong>ID Buku:</strong> {selectedLoan.bookId}</p>
-                <p><strong>Nama Peminjam:</strong> {selectedLoan.name}</p>
-                <p><strong>NRP:</strong> {selectedLoan.nrp}</p>
-                <p><strong>Tanggal Pinjam:</strong> {selectedLoan.tglPinjam}</p>
-                <p><strong>Tanggal Harus Kembali:</strong> {selectedLoan.tglKembali}</p>
+              <h3 className="text-lg lg:text-xl font-bold mb-4 text-gray-800">Konfirmasi Pengembalian</h3>
+              <div className="space-y-1.5 text-sm text-gray-600">
+                <p><strong>Judul:</strong> {selectedLoan.book.title}</p>
+                <p><strong>ISBN:</strong> {selectedLoan.book.isbn}</p>
+                <p><strong>Peminjam:</strong> {selectedLoan.user.name} ({selectedLoan.user.nrp})</p>
+                <p><strong>Dipinjam:</strong> {new Date(selectedLoan.borrowDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric'})}</p>
+                <p><strong>Harus Kembali:</strong> {new Date(selectedLoan.returnDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric'})}</p>
               </div>
-              <div className="mt-6 border-t pt-4">
-                <label className="block text-sm font-medium text-gray-800 mb-2">
-                    Apakah Anda yakin ingin menyelesaikan peminjaman ini?
-                </label>
-                <p className="text-xs text-gray-500 mb-4">
-                  Tindakan ini akan memindahkan data dari list Peminjaman ke Pengembalian.
+              <div className="mt-6 border-t border-gray-200 pt-5">
+                <p className="text-sm text-gray-500 mb-4">
+                    Pastikan buku sudah diterima sebelum melanjutkan.
                 </p>
-                <div className="flex justify-end space-x-3">
-                  <button onClick={() => setShowReturnModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-black hover:bg-gray-100">
-                    Batal
-                  </button>
-                  <button onClick={handleReturnBook} className="px-4 py-2 bg-[#678D7D] text-white rounded-lg hover:bg-[#5a776d]">
-                    Ya, Kembalikan Buku
-                  </button>
+                <div className="flex flex-col sm:flex-row justify-end gap-3">
+                  <button 
+                    onClick={() => setShowReturnModal(false)} 
+                    className="px-5 py-2 rounded-lg border border-gray-400 text-gray-700 hover:bg-gray-100 transition w-full sm:w-auto text-sm font-medium"
+                  > Batal </button>
+                  <button 
+                    onClick={handleReturnBook} 
+                    disabled={loadingTabData}
+                    className="px-5 py-2 bg-[#678D7D] text-white rounded-lg hover:bg-[#5a776d] transition w-full sm:w-auto text-sm font-medium disabled:opacity-70"
+                  > {loadingTabData ? "Memproses..." : "Ya, Kembalikan"} </button>
                 </div>
               </div>
             </motion.div>

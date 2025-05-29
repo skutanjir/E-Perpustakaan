@@ -1,12 +1,11 @@
-// app/mahasiswa/login/page.tsx
 "use client";
 
 import React, { JSX, useState, FormEvent } from "react";
 import Image from "next/image";
 import Cookies from "js-cookie";
-import { useRouter } from "next/navigation"; // For App Router
+import { useRouter } from "next/navigation";
 import { post } from "@/lib/api/apiService";
-// import type { ApiErrorResponse } from "@/lib/api/apiService";
+import { jwtDecode } from "jwt-decode"; // 1. Impor jwt-decode
 
 // Define expected response types
 interface LoginSuccessData {
@@ -14,9 +13,18 @@ interface LoginSuccessData {
   refreshToken: string;
 }
 
-interface LoginApiResponse { // This is what your 'post' utility's Promise<T> will resolve to
+interface LoginApiResponse {
   data?: LoginSuccessData;
   error?: string | Array<{[key: string]: string}>;
+}
+
+// 2. Definisikan Interface untuk payload token yang sudah di-decode
+interface DecodedAccessToken {
+    sub: string;    // User ID
+    name: string;   // Asumsi ada nama di token
+    email: string;  // Asumsi ada email
+    role: string;   // Properti role yang akan kita periksa
+    // Tambahkan iat, exp jika perlu diakses
 }
 
 export default function MahasiswaLogin(): JSX.Element {
@@ -33,51 +41,58 @@ export default function MahasiswaLogin(): JSX.Element {
     setLoading(true);
 
     try {
-      // Use your 'post' utility function
-      // The type argument LoginApiResponse defines the expected structure of a successful response *or* an API error response
-      // that might still come with a 2xx status but indicates a business logic error if not structured for success.
-      // However, typically, non-2xx errors would be thrown by an Axios-like utility.
       const result = await post<LoginApiResponse>("/users/login", { email, password });
-      console.log(result.data);
-      // Assuming 'post' resolves with the parsed JSON data directly for successful responses (2xx)
-      // and throws an error for non-2xx responses which will be caught by the catch block.
+      
       if (result.data && result.data.accessToken && result.data.refreshToken) {
-        Cookies.set("accessToken", result.data.accessToken, { expires: 1 / 24 * 0.5 }); // 30 minutes
-        Cookies.set("refreshToken", result.data.refreshToken, { expires: 7 }); // 7 days
+        const newAccessToken = result.data.accessToken;
+        const newRefreshToken = result.data.refreshToken;
+
+        Cookies.set("accessToken", newAccessToken, { expires: 1 / 24 }); // 1 jam
+        Cookies.set("refreshToken", newRefreshToken, { expires: 7 });   // 7 hari
 
         setLoading(false);
-        router.push("/books");
-      } else {
-        // This case might be hit if the API returns a 2xx status but the data structure is not as expected
-        // or if 'post' utility doesn't throw for certain "soft" API errors.
-        const errorMessage = result.error || "Login successful, but token data is missing.";
-        if (Array.isArray(result.error) && result.error.length > 0) {
-          const firstErrorKey = Object.keys(result.error[0])[0];
-          setError(result.error[0][firstErrorKey] || "Login failed.");
-        } else {
-          setError(errorMessage as string);
+
+        // ==================================================================
+        // 3. Logika Role-Based Redirect
+        // ==================================================================
+        try {
+          const decodedToken = jwtDecode<DecodedAccessToken>(newAccessToken);
+          // Pastikan nama properti 'role' dan nilainya ('admin') sesuai dengan yang ada di JWT Anda
+          if (decodedToken.role && decodedToken.role.toLowerCase() === "administrator") {
+            router.push("/admin"); // Arahkan ke dashboard admin
+          } else {
+            router.push("/books"); // Arahkan ke halaman buku untuk role lain
+          }
+        } catch (decodeError) {
+          // Jika gagal decode token (seharusnya tidak terjadi jika login sukses)
+          // Fallback ke redirect standar
+          router.push("/books"); 
         }
+        // ==================================================================
+
+      } else {
+        const errorMessageText = typeof result.error === 'string' 
+            ? result.error 
+            : (Array.isArray(result.error) && result.error.length > 0 && typeof result.error[0] === 'object' && result.error[0] !== null 
+                ? Object.values(result.error[0])[0] as string
+                : "Login berhasil, tetapi token tidak ditemukan.");
+        setError(errorMessageText || "Login gagal, data token tidak lengkap.");
         setLoading(false);
       }
 
-    } catch (err: any) { // Catch block will handle errors thrown by 'post' (e.g., network errors, non-2xx statuses)
-      console.error("Login API call error:", err);
-      // Attempt to parse error message from an Axios-like error structure
-      // where the actual API error response is in err.response.data
-      const apiError = err.response?.data;
-      let errorMessage = "An unexpected error occurred. Please try again.";
+    } catch (err: any) {
+      const apiError = err.response?.data || err; // Ambil err jika err.response.data tidak ada
+      let errorMessage = "Terjadi kesalahan tidak terduga. Silakan coba lagi.";
 
       if (apiError) {
-        if (Array.isArray(apiError.error) && apiError.error.length > 0) {
-          const firstErrorKey = Object.keys(apiError.error[0])[0];
-          errorMessage = apiError.error[0][firstErrorKey] || "Login failed.";
+        if (Array.isArray(apiError.error) && apiError.error.length > 0 && typeof apiError.error[0] === 'object' && apiError.error[0] !== null) {
+          errorMessage = Object.values(apiError.error[0])[0] as string || "Login gagal.";
         } else if (typeof apiError.error === 'string') {
           errorMessage = apiError.error;
         } else if (typeof apiError.message === 'string') {
           errorMessage = apiError.message;
         }
       } else if (err.message) {
-        // Fallback to error.message if no err.response.data
         errorMessage = err.message;
       }
 
@@ -91,11 +106,11 @@ export default function MahasiswaLogin(): JSX.Element {
         <div className="bg-white rounded-xl shadow-2xl p-8 sm:p-10 w-full max-w-md">
           <div className="flex justify-center mb-6">
             <Image
-                src="/logo.png" // Ensure this path is correct (public/logo.png)
+                src="/logo.png"
                 alt="E-Pustaka Logo"
-                width={150} // Adjusted size for better aesthetics
+                width={150}
                 height={150}
-                priority // Good for LCP
+                priority
                 className="rounded-full"
             />
           </div>
@@ -176,14 +191,12 @@ export default function MahasiswaLogin(): JSX.Element {
               </button>
             </div>
 
-            {/* Forgot Password */}
             <div className="flex justify-end">
               <a href="/reset-password" className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition duration-150 ease-in-out">
                 Lupa Password?
               </a>
             </div>
 
-            {/* Submit Button */}
             <button
                 type="submit"
                 disabled={loading}
@@ -205,7 +218,7 @@ export default function MahasiswaLogin(): JSX.Element {
 
           <p className="text-center text-sm mt-8 text-gray-600">
             Belum memiliki akun?{" "}
-            <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition duration-150 ease-in-out">
+            <a href="/auth/user/register" className="font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition duration-150 ease-in-out">
               Daftar Sekarang
             </a>
           </p>

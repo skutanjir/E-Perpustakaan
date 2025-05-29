@@ -1,55 +1,89 @@
+// Nama file: app/books/[id]/page.tsx
+
 "use client";
 
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation"; // DIUBAH: Impor useParams
 import Header from "@/components/Header";
 import Image from "next/image";
+import { getBookByIsbn } from "@/lib/api/apiService";
+import { Book } from "@/types";
 
-interface Buku {
-  cover: string;
-  title: string;
-  author: string;
-  description: string;
-  penerbit: string;
-  tahun: string;
-  eisbn: string;
-  kategori: string;
-}
+// TIDAK PERLU PageProps lagi karena params diambil via hook
+// interface PageProps {
+//   params: {
+//     id: string; 
+//   };
+// }
 
-const bukuStatic: Buku = {
-  cover: "/covers/seni-hidup-minimalis.jpg",
-  title:
-    "Seni Hidup Minimalis dengan Judul Sangat Panjang Sekali Supaya Bisa Dicek Responsivenya",
-  author: "Francine Jay",
-  description:
-    "Deskripsi Singkat: Buku ini membahas prinsip-prinsip hidup minimalis, termasuk metode STREAMLINE yang membantu pembaca menyederhanakan kehidupan mereka dengan mengurangi kepemilikan barang yang tidak perlu.",
-  penerbit: "Gramedia Pustaka Utama",
-  tahun: "2019 (Cetakan ke-3)",
-  eisbn: "978-602-03-3147-2",
-  kategori: "Pengembangan Diri / Gaya Hidup",
-};
+export default function BookDetailPage(): JSX.Element { // DIUBAH: Hapus params dari props
+  const router = useRouter();
+  const paramsFromHook = useParams<{ id: string }>(); // DIUBAH: Menggunakan hook useParams
+  const { id } = paramsFromHook; // 'id' di sini berisi ISBN, diambil dari hasil hook
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
+  const [buku, setBuku] = useState<Book | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default function MahasiswaPage({ params }: PageProps): JSX.Element {
-  const { id } = params;
-  const buku = bukuStatic;
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const apiBook = await getBookByIsbn(id as string); // id dari useParams bisa string | string[]
+        if (apiBook) {
+          setBuku(apiBook);
+        } else {
+          setError("Buku tidak ditemukan.");
+        }
+      } catch (err) {
+        setError("Gagal memuat data buku.");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id]); // Tetap menggunakan id (yang sekarang dari useParams) sebagai dependency
 
   function handlePinjam() {
-    alert(`Meminjam buku "${buku.title}" dengan ID ${id}`);
-    // logika pinjam buku bisa ditambahkan di sini
+    router.push(`/books/borrowings/${id}`); 
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-lg text-gray-600">Memuat detail buku...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-lg text-red-500">{error}</p>
+      </div>
+    );
+  }
+
+  if (!buku) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <p className="text-lg text-gray-600">Buku tidak ditemukan.</p>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gray-100 relative">
       <Header />
-
       <main className="flex items-center justify-center p-6 min-h-[80vh]">
         <section className="w-full max-w-3xl bg-gray-50 border border-gray-200 rounded-2xl p-8 shadow-lg relative z-10">
           <h2 className="text-2xl font-semibold text-black mb-6">
-            Detail Buku - ID BUKU: {id}
+            Detail Buku
           </h2>
 
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
@@ -59,19 +93,18 @@ export default function MahasiswaPage({ params }: PageProps): JSX.Element {
                 alt={buku.title}
                 fill
                 style={{ objectFit: "cover" }}
+                priority
               />
             </div>
             <div className="flex-1 min-w-0">
               <h3
-                className="text-3xl font-semibold text-gray-800 break-words overflow-wrap-anywhere"
-                style={{ wordBreak: "break-word" }}
+                className="text-3xl font-semibold text-gray-800 break-words"
                 title={buku.title}
               >
                 {buku.title}
               </h3>
-              <p className="text-gray-600 mt-2">{buku.author}</p>
-              <p className="text-gray-700 mt-4 leading-relaxed">{buku.description}</p>
-
+              <p className="text-gray-600 mt-2">{buku.author.name}</p>
+              <p className="text-gray-700 mt-4 leading-relaxed">{buku.description || 'Tidak ada deskripsi.'}</p>
               <button
                 onClick={handlePinjam}
                 className="mt-6 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-green-600 transition whitespace-nowrap"
@@ -85,19 +118,22 @@ export default function MahasiswaPage({ params }: PageProps): JSX.Element {
 
           <div className="grid grid-cols-2 gap-y-4 text-gray-800">
             <span className="font-medium">Pengarang</span>
-            <span className="text-gray-700">{buku.author}</span>
-
-            <span className="font-medium">Penerbit</span>
-            <span className="text-gray-700">{buku.penerbit}</span>
+            <span className="text-gray-700">{buku.author.name}</span>
 
             <span className="font-medium">Tahun Terbit</span>
-            <span className="text-gray-700">{buku.tahun}</span>
+            <span className="text-gray-700">{buku.year}</span>
 
-            <span className="font-medium">EISBN</span>
-            <span className="text-gray-700">{buku.eisbn}</span>
+            <span className="font-medium">ISBN</span>
+            <span className="text-gray-700">{buku.isbn}</span>
 
             <span className="font-medium">Kategori</span>
-            <span className="text-gray-700">{buku.kategori}</span>
+            <span className="text-gray-700">{buku.category?.name || '-'}</span>
+            
+            <span className="font-medium">Halaman</span>
+            <span className="text-gray-700">{buku.pages || '-'}</span>
+            
+            <span className="font-medium">Bahasa</span>
+            <span className="text-gray-700">{buku.language || '-'}</span>
           </div>
         </section>
       </main>

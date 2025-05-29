@@ -1,14 +1,16 @@
-// lib/api/apiService.ts (Simplified relevant part)
 import axiosInstance from './axiosInstance';
 import { AxiosRequestConfig, AxiosError } from 'axios';
+import { Book } from '@/types'; // Pastikan tipe Book sudah didefinisikan
 
 export interface ApiErrorResponse {
     message: string;
-    errors?: Array<{ field?: string; message: string }>;
+    error?: string;
+    errors?: Array<{ field?: string; message:string }>;
     statusCode?: number;
 }
 
-const apiRequest = async <T = any, D = any>(
+// PERUBAHAN: Tambahkan 'export' di sini
+export const apiRequest = async <T = any, D = any>(
     method: string,
     url: string,
     data?: D,
@@ -24,25 +26,36 @@ const apiRequest = async <T = any, D = any>(
         return response.data;
     } catch (error) {
         const axiosError = error as AxiosError<ApiErrorResponse>;
-        console.error(
-            `API request failed: ${method.toUpperCase()} ${url}`,
-            axiosError.response?.data || axiosError.message
-        );
         if (axiosError.response && axiosError.response.data) {
-            const errData = axiosError.response.data;
-            if (typeof errData === 'object' && errData !== null) {
-                (errData as ApiErrorResponse).statusCode = axiosError.response.status;
-            }
-            throw errData;
+            throw axiosError.response.data;
         } else {
-            throw new Error(axiosError.message || 'An unknown API error occurred') as ApiErrorResponse;
+            throw { message: axiosError.message || 'An unknown API error occurred' } as ApiErrorResponse;
         }
     }
 };
 
+export const get = <T = any>(
+    url: string, 
+    config?: AxiosRequestConfig
+): Promise<T> => {
+    return apiRequest<T>('get', url, undefined, config);
+};
+
 export const post = <T = any, D = any>(
-    url: string,
-    data: D,    config?: AxiosRequestConfig
+    url: string, 
+    data: D, 
+    config?: AxiosRequestConfig
 ): Promise<T> => {
     return apiRequest<T, D>('post', url, data, config);
+};
+
+// Contoh fungsi yang sudah ada, pastikan tipe Book ada di @/types
+export const getBookByIsbn = async (isbn: string): Promise<Book | null> => {
+    const response = await get<{ data: Book[] }>('/books/search', {
+        params: {
+            bookId: isbn,
+            pageSize: '1'
+        }
+    });
+    return response.data[0] || null;
 };

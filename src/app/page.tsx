@@ -55,14 +55,14 @@ export default function Home(): JSX.Element {
           <div className="relative group">
             <button className={`${scrolled ? 'bg-green-100 text-green-800' : 'bg-white text-gray-800'} px-5 py-2 rounded-lg font-medium transition`}>Daftar</button>
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition">
-              <a href="/daftar/mahasiswa" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mahasiswa</a>
+              <a href="/daftar/user" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">User</a>
             </div>
           </div>
           <div className="relative group">
             <button className={`${scrolled ? 'bg-green-700 text-white' : 'bg-green-600 text-white'} px-5 py-2 rounded-lg font-medium transition`}>Masuk</button>
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition">
-              <a href="/login/mahasiswa" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Mahasiswa</a>
-              <a href="/login/admin" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Admin</a>
+              <a href="/auth/user/login" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">User</a>
+              <a href="/auth/user/register" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Admin</a>
             </div>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function Home(): JSX.Element {
               <button onClick={() => setMobileRegisterOpen(!mobileRegisterOpen)} className="w-full text-left py-2 text-lg text-gray-800 hover:bg-gray-100 rounded transition">Daftar</button>
               {mobileRegisterOpen && (
                 <div className="pl-4">
-                  <a href="/daftar/mahasiswa" className="block py-2 text-gray-700 hover:bg-gray-100 rounded transition">Mahasiswa</a>
+                  <a href="/daftar/user" className="block py-2 text-gray-700 hover:bg-gray-100 rounded transition">User</a>
                 </div>
               )}
             </div>
@@ -98,8 +98,8 @@ export default function Home(): JSX.Element {
               <button onClick={() => setMobileLoginOpen(!mobileLoginOpen)} className="w-full text-left py-2 text-lg text-gray-800 hover:bg-gray-100 rounded transition">Masuk</button>
               {mobileLoginOpen && (
                 <div className="pl-4">
-                  <a href="/login/mahasiswa" className="block py-2 text-gray-700 hover:bg-gray-100 rounded transition">Mahasiswa</a>
-                  <a href="/login/admin" className="block py-2 text-gray-700 hover:bg-gray-100 rounded transition">Admin</a>
+                  <a href="/auth/user/login" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">User</a>
+                  <a href="/auth/user/register" className="block py-2 text-gray-700 hover:bg-gray-100 rounded transition">Admin</a>
                 </div>
               )}
             </div>

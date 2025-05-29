@@ -55,7 +55,7 @@ export default function SidebarAdmin() {
   // Sidebar desktop
   const sidebarContent = (
     <aside
-      className={`bg-gray-100 text-gray-800 h-screen border-r border-gray-200 flex flex-col transition-all duration-300 ${
+      className={`bg-gray-100 text-gray-800 h-screen-full border-r border-gray-200 flex flex-col transition-all duration-300 ${
         expanded ? "w-48" : "w-16"
       } min-w-[64px]`}
       style={{ paddingTop: "80px" }} // jarak atas supaya tidak tertutup header fixed
